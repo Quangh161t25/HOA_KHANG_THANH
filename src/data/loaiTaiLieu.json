@@ -1,0 +1,67 @@
+[
+ {
+  "id": "ltl-1",
+  "ma": "CV",
+  "ten": "Công văn",
+  "ghi_chu": "Văn bản giao dịch",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ltl-2",
+  "ma": "QD",
+  "ten": "Quyết định",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ltl-3",
+  "ma": "BC",
+  "ten": "Báo cáo",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ltl-4",
+  "ma": "HD",
+  "ten": "Hợp đồng",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ltl-5",
+  "ma": "TB",
+  "ten": "Thông báo",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ltl-6",
+  "ma": "TT",
+  "ten": "Tờ trình",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ltl-7",
+  "ma": "BB",
+  "ten": "Biên bản",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ltl-8",
+  "ma": "BCTH",
+  "ten": "Báo cáo tài chính",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ }
+]

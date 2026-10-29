@@ -1,0 +1,32 @@
+[
+ {
+  "id": "mph-1",
+  "ma": "TU_CHOI",
+  "ten_loai": "Từ chối",
+  "tieu_de": "Thông báo kết quả ứng tuyển – <<[ten_cong_ty]>>",
+  "noi_dung_mau": "<p style=\"text-align: right\"><strong><<[ten_cong_ty]>></strong></p>\n<p style=\"text-align: right\">Ngày <<[ngay_hien_tai]>></p>\n<p>Kính gửi anh/chị <strong><<[ten_ung_vien]>></strong>,</p>\n<p>Trước hết, <strong><<[ten_cong_ty]>></strong> chân thành cảm ơn anh/chị đã dành thời gian quan tâm và gửi hồ sơ ứng tuyển vị trí <strong><<[vi_tri_ung_tuyen]>></strong> tại công ty chúng tôi.</p>\n<p>Sau quá trình xem xét kỹ lưỡng, chúng tôi rất tiếc phải thông báo rằng trong giai đoạn này chúng tôi đã lựa chọn được ứng viên phù hợp hơn với yêu cầu của vị trí. Quyết định này không phản ánh năng lực hay giá trị của anh/chị, mà chỉ phụ thuộc vào nhu cầu cụ thể của công ty tại thời điểm hiện tại.</p>\n<p>Chúng tôi ghi nhận sự quan tâm của anh/chị và mong rằng trong tương lai sẽ có cơ hội hợp tác. Chúc anh/chị sớm tìm được công việc phù hợp và thành công trên con đường sự nghiệp.</p>\n<p>Mọi thắc mắc xin vui lòng liên hệ: <strong><<[email_lien_he]>></strong> hoặc <strong><<[so_dien_thoai_lien_he]>></strong>.</p>\n<p>Trân trọng,<br><strong>Phòng Nhân sự<br><<[ten_cong_ty]>></strong></p>",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-15T10:30:00Z"
+ },
+ {
+  "id": "mph-2",
+  "ma": "MOI_PV",
+  "ten_loai": "Mời phỏng vấn",
+  "tieu_de": "Thư mời tham gia phỏng vấn – <<[ten_cong_ty]>>",
+  "noi_dung_mau": "<p style=\"text-align: right\"><strong><<[ten_cong_ty]>></strong></p>\n<p style=\"text-align: right\">Ngày <<[ngay_hien_tai]>></p>\n<p>Kính gửi anh/chị <strong><<[ten_ung_vien]>></strong>,</p>\n<p>Cảm ơn anh/chị đã quan tâm và nộp hồ sơ ứng tuyển vị trí <strong><<[vi_tri_ung_tuyen]>></strong> tại <strong><<[ten_cong_ty]>></strong>. Sau khi xem xét hồ sơ, chúng tôi trân trọng mời anh/chị tham gia buổi phỏng vấn với thông tin cụ thể như sau:</p>\n<h3>Thông tin buổi phỏng vấn</h3>\n<table>\n  <thead>\n    <tr><th>Nội dung</th><th>Chi tiết</th></tr>\n  </thead>\n  <tbody>\n    <tr><td>Thời gian</td><td><<[ngay_phong_van]>> — <<[gio_phong_van]>></td></tr>\n    <tr><td>Địa điểm</td><td><<[dia_diem_phong_van]>></td></tr>\n    <tr><td>Hình thức</td><td>Phỏng vấn trực tiếp (vui lòng có mặt trước 10–15 phút)</td></tr>\n    <tr><td>Liên hệ</td><td><<[so_dien_thoai_lien_he]>> / <<[email_lien_he]>></td></tr>\n  </tbody>\n</table>\n<h3>Hồ sơ / tài liệu cần mang theo</h3>\n<ul>\n  <li>CMND/CCCD (bản chính hoặc bản sao công chứng).</li>\n  <li>Bằng cấp, chứng chỉ liên quan đến vị trí ứng tuyển.</li>\n  <li>Sơ yếu lý lịch (bản in) nếu có cập nhật so với hồ sơ đã gửi.</li>\n</ul>\n<p>Nếu anh/chị có trở ngại về lịch hẹn trên, vui lòng phản hồi sớm qua <strong><<[email_lien_he]>></strong> để chúng tôi sắp xếp lại. Chúng tôi mong được gặp anh/chị.</p>\n<p>Trân trọng,<br><strong>Phòng Nhân sự<br><<[ten_cong_ty]>></strong></p>",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-15T10:30:00Z"
+ },
+ {
+  "id": "mph-3",
+  "ma": "MOI_NHAN_VIEC",
+  "ten_loai": "Thư mời nhận việc",
+  "tieu_de": "Thư mời nhận việc – <<[ten_cong_ty]>>",
+  "noi_dung_mau": "<p style=\"text-align: right\"><strong><<[ten_cong_ty]>></strong></p>\n<p style=\"text-align: right\">Ngày <<[ngay_hien_tai]>></p>\n<p>Kính gửi anh/chị <strong><<[ten_ung_vien]>></strong>,</p>\n<p>Công ty <strong><<[ten_cong_ty]>></strong> trân trọng thông báo anh/chị đã trúng tuyển vị trí <strong><<[vi_tri_ung_tuyen]>></strong>. Chúng tôi gửi kèm các thông tin cần thiết để anh/chị chuẩn bị và hoàn tất thủ tục nhận việc.</p>\n<h3>1. Thời gian &amp; địa điểm làm việc</h3>\n<table>\n  <thead>\n    <tr><th>Nội dung</th><th>Chi tiết</th></tr>\n  </thead>\n  <tbody>\n    <tr><td>Ngày nhận việc</td><td><<[ngay_nhan_viec]>></td></tr>\n    <tr><td>Địa điểm</td><td>Trụ sở công ty (địa chỉ chi tiết sẽ gửi qua email)</td></tr>\n    <tr><td>Liên hệ</td><td><<[so_dien_thoai_lien_he]>> — <<[email_lien_he]>></td></tr>\n  </tbody>\n</table>\n<h3>2. Chế độ lương &amp; phúc lợi</h3>\n<table>\n  <thead>\n    <tr><th>Nội dung</th><th>Chi tiết</th></tr>\n  </thead>\n  <tbody>\n    <tr><td>Bậc lương</td><td><<[bac_luong]>></td></tr>\n    <tr><td>Mức lương</td><td><<[muc_luong]>></td></tr>\n    <tr><td>Cơ chế khác</td><td><<[co_che_khac]>></td></tr>\n    <tr><td>Ghi chú khác</td><td><<[ghi_chu_khac]>></td></tr>\n  </tbody>\n</table>\n<h3>3. Hồ sơ cần mang theo khi nhận việc</h3>\n<ul>\n  <li>CMND/CCCD, sổ hộ khẩu (bản sao công chứng).</li>\n  <li>Ảnh 3x4, giấy khám sức khỏe (trong vòng 6 tháng).</li>\n  <li>Bằng cấp, chứng chỉ liên quan đến vị trí ứng tuyển.</li>\n</ul>\n<p>Mọi thắc mắc anh/chị vui lòng liên hệ <strong><<[email_lien_he]>></strong>. Chúc anh/chị nhiều sức khỏe và thành công trong công việc sắp tới.</p>\n<p>Trân trọng,<br><strong>Phòng Nhân sự<br><<[ten_cong_ty]>></strong></p>",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-15T10:30:00Z"
+ }
+]

@@ -1,0 +1,138 @@
+[
+ {
+  "id": "tguv-1",
+  "id_ung_vien": "uv-1",
+  "loai_thu": "tu-choi",
+  "ghi_chu": null,
+  "tg_tao": "2025-02-01T10:00:00Z",
+  "tg_cap_nhat": "2025-02-01T10:00:00Z"
+ },
+ {
+  "id": "tguv-2",
+  "id_ung_vien": "uv-2",
+  "loai_thu": "moi-nhan-viec",
+  "ngay_vao_lam": "2025-02-15",
+  "bac_luong": "L_04 - Nhân viên",
+  "muc_luong": "15.000.000 VND/tháng",
+  "co_che_khac": "BHXH, BHYT, BHTN theo quy định; thưởng tháng/quý theo KPI.",
+  "ghi_chu_khac": "Thử việc 2 tháng.",
+  "ghi_chu": null,
+  "tg_tao": "2025-01-28T09:00:00Z",
+  "tg_cap_nhat": "2025-01-28T09:00:00Z"
+ },
+ {
+  "id": "tguv-3",
+  "id_ung_vien": "uv-3",
+  "loai_thu": "tu-choi",
+  "ghi_chu": "Ứng viên không đáp ứng yêu cầu kỹ thuật",
+  "tg_tao": "2025-02-05T14:20:00Z",
+  "tg_cap_nhat": "2025-02-05T14:20:00Z"
+ },
+ {
+  "id": "tguv-4",
+  "id_ung_vien": "uv-4",
+  "loai_thu": "moi-nhan-viec",
+  "ngay_vao_lam": "2025-03-01",
+  "bac_luong": "L_03 - Trưởng phòng",
+  "muc_luong": "25.000.000 VND/tháng",
+  "co_che_khac": "Phụ cấp trách nhiệm; thưởng theo hiệu quả công việc.",
+  "ghi_chu_khac": null,
+  "ghi_chu": "Gửi kèm thông tin onboard",
+  "tg_tao": "2025-02-10T11:00:00Z",
+  "tg_cap_nhat": "2025-02-10T11:00:00Z"
+ },
+ {
+  "id": "tguv-5",
+  "id_ung_vien": "uv-1",
+  "loai_thu": "moi-nhan-viec",
+  "ngay_vao_lam": "2025-02-20",
+  "ghi_chu": null,
+  "tg_tao": "2025-02-12T08:30:00Z",
+  "tg_cap_nhat": "2025-02-12T08:30:00Z"
+ },
+ {
+  "id": "tguv-6",
+  "id_ung_vien": "uv-2",
+  "loai_thu": "tu-choi",
+  "ghi_chu": null,
+  "tg_tao": "2025-01-15T16:00:00Z",
+  "tg_cap_nhat": "2025-01-15T16:00:00Z"
+ },
+ {
+  "id": "tguv-7",
+  "id_ung_vien": "uv-3",
+  "loai_thu": "moi-nhan-viec",
+  "ngay_vao_lam": "2025-03-10",
+  "ghi_chu": null,
+  "tg_tao": "2025-02-18T09:15:00Z",
+  "tg_cap_nhat": "2025-02-18T09:15:00Z"
+ },
+ {
+  "id": "tguv-8",
+  "id_ung_vien": "uv-4",
+  "loai_thu": "tu-choi",
+  "ghi_chu": "Đã chọn ứng viên khác phù hợp hơn",
+  "tg_tao": "2025-02-03T10:45:00Z",
+  "tg_cap_nhat": "2025-02-03T10:45:00Z"
+ },
+ {
+  "id": "tguv-9",
+  "id_ung_vien": "uv-1",
+  "loai_thu": "tu-choi",
+  "ghi_chu": null,
+  "tg_tao": "2025-01-20T13:00:00Z",
+  "tg_cap_nhat": "2025-01-20T13:00:00Z"
+ },
+ {
+  "id": "tguv-10",
+  "id_ung_vien": "uv-2",
+  "loai_thu": "moi-nhan-viec",
+  "ngay_vao_lam": "2025-02-25",
+  "ghi_chu": "Xác nhận qua email",
+  "tg_tao": "2025-01-30T14:30:00Z",
+  "tg_cap_nhat": "2025-01-30T14:30:00Z"
+ },
+ {
+  "id": "tguv-11",
+  "id_ung_vien": "uv-3",
+  "loai_thu": "tu-choi",
+  "ghi_chu": null,
+  "tg_tao": "2025-02-08T11:20:00Z",
+  "tg_cap_nhat": "2025-02-08T11:20:00Z"
+ },
+ {
+  "id": "tguv-12",
+  "id_ung_vien": "uv-4",
+  "loai_thu": "moi-nhan-viec",
+  "ngay_vao_lam": "2025-03-05",
+  "ghi_chu": null,
+  "tg_tao": "2025-02-14T15:00:00Z",
+  "tg_cap_nhat": "2025-02-14T15:00:00Z"
+ },
+ {
+  "id": "tguv-13",
+  "id_ung_vien": "uv-1",
+  "loai_thu": "moi-nhan-viec",
+  "ngay_vao_lam": "2025-02-28",
+  "ghi_chu": "Vị trí Senior Dev",
+  "tg_tao": "2025-02-16T08:00:00Z",
+  "tg_cap_nhat": "2025-02-16T08:00:00Z"
+ },
+ {
+  "id": "tguv-14",
+  "id_ung_vien": "uv-2",
+  "loai_thu": "tu-choi",
+  "ghi_chu": null,
+  "tg_tao": "2025-01-25T09:30:00Z",
+  "tg_cap_nhat": "2025-01-25T09:30:00Z"
+ },
+ {
+  "id": "tguv-15",
+  "id_ung_vien": "uv-3",
+  "loai_thu": "moi-nhan-viec",
+  "ngay_vao_lam": "2025-03-15",
+  "ghi_chu": null,
+  "tg_tao": "2025-02-20T10:00:00Z",
+  "tg_cap_nhat": "2025-02-20T10:00:00Z"
+ }
+]

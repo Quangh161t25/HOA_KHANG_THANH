@@ -1,0 +1,72 @@
+[
+ {
+  "id": "ttl-1",
+  "ma": "NHAP",
+  "ten": "Nháp",
+  "thu_tu": 1,
+  "mau": "#94a3b8",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ttl-2",
+  "ma": "CHO_DUYET",
+  "ten": "Chờ duyệt",
+  "thu_tu": 2,
+  "mau": "#f59e0b",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ttl-3",
+  "ma": "DA_DUYET",
+  "ten": "Đã duyệt",
+  "thu_tu": 3,
+  "mau": "#3b82f6",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ttl-4",
+  "ma": "DA_KY",
+  "ten": "Đã ký",
+  "thu_tu": 4,
+  "mau": "#22c55e",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ttl-5",
+  "ma": "DA_GUI",
+  "ten": "Đã gửi",
+  "thu_tu": 5,
+  "mau": "#6366f1",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ttl-6",
+  "ma": "LUU_TRU",
+  "ten": "Lưu trữ",
+  "thu_tu": 6,
+  "mau": "#64748b",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ttl-7",
+  "ma": "HUY",
+  "ten": "Hủy",
+  "thu_tu": 7,
+  "mau": "#ef4444",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ }
+]

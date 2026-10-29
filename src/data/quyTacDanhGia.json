@@ -1,0 +1,16 @@
+[
+ {
+  "id": "qtdg-1",
+  "ten": "Quy tắc mặc định",
+  "thang_diem_min": 1,
+  "thang_diem_max": 5,
+  "nguong_xuat_sac": 4.5,
+  "nguong_tot": 4,
+  "nguong_kha": 3,
+  "nguong_trung_binh": 2,
+  "ghi_chu": "Áp dụng chung cho đánh giá thử việc",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ }
+]

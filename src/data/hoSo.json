@@ -1,0 +1,71 @@
+[
+ {
+  "id": "hs-1",
+  "id_tai_lieu": "tl-1",
+  "ma_ho_so": "HS-2025-01",
+  "ten_ho_so": "Hồ sơ nhân sự quý I/2025",
+  "id_phong_ban": "dep-2",
+  "thoi_han_luu_tru": "2030-12-31",
+  "mo_ta": "Hợp đồng, quyết định nhân sự",
+  "trang_thai": "Đang hoạt động",
+  "id_chuc_vu_xem": [],
+  "id_nhan_vien_xem": [],
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-15T08:00:00Z"
+ },
+ {
+  "id": "hs-2",
+  "id_tai_lieu": "tl-2",
+  "ma_ho_so": "HS-2025-02",
+  "ten_ho_so": "Hồ sơ công văn đến/đi",
+  "id_phong_ban": "dep-7",
+  "thoi_han_luu_tru": "2030-12-31",
+  "mo_ta": "Công văn trao đổi với cơ quan nhà nước",
+  "trang_thai": "Đang hoạt động",
+  "id_chuc_vu_xem": [],
+  "id_nhan_vien_xem": [],
+  "tg_tao": "2025-01-05T08:00:00Z",
+  "tg_cap_nhat": "2025-01-20T10:00:00Z"
+ },
+ {
+  "id": "hs-3",
+  "id_tai_lieu": "tl-1",
+  "ma_ho_so": "HS-2024-12",
+  "ten_ho_so": "Hồ sơ nội quy công ty",
+  "id_phong_ban": "dep-7",
+  "mo_ta": "Quyết định, thông báo nội quy",
+  "trang_thai": "Đang hoạt động",
+  "id_chuc_vu_xem": [],
+  "id_nhan_vien_xem": [],
+  "tg_tao": "2024-12-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-10T09:00:00Z"
+ },
+ {
+  "id": "hs-4",
+  "id_tai_lieu": "tl-6",
+  "ma_ho_so": "HS-2025-03",
+  "ten_ho_so": "Hồ sơ dự án đầu tư",
+  "id_phong_ban": "dep-1",
+  "thoi_han_luu_tru": "2035-12-31",
+  "mo_ta": "Tờ trình, quyết định phê duyệt dự án",
+  "trang_thai": "Đang hoạt động",
+  "id_chuc_vu_xem": [],
+  "id_nhan_vien_xem": [],
+  "tg_tao": "2025-02-01T08:00:00Z",
+  "tg_cap_nhat": "2025-02-05T14:00:00Z"
+ },
+ {
+  "id": "hs-5",
+  "id_tai_lieu": "tl-4",
+  "ma_ho_so": "HS-2025-04",
+  "ten_ho_so": "Hồ sơ đấu thầu",
+  "id_phong_ban": "dep-4",
+  "thoi_han_luu_tru": "2032-06-30",
+  "mo_ta": "Hồ sơ mời thầu, biên bản mở thầu",
+  "trang_thai": "Đang hoạt động",
+  "id_chuc_vu_xem": [],
+  "id_nhan_vien_xem": [],
+  "tg_tao": "2025-02-10T08:00:00Z",
+  "tg_cap_nhat": "2025-02-12T11:00:00Z"
+ }
+]

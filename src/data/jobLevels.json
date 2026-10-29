@@ -1,0 +1,46 @@
+[
+ {
+  "id": "lvl-1",
+  "ma_cap_bac": "L_01",
+  "ten_cap_bac": "Giám đốc",
+  "thu_tu": 1,
+  "luong_co_ban": 50000000,
+  "mo_ta": "Lãnh đạo cấp cao nhất, chịu trách nhiệm toàn bộ hoạt động.",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T00:00:00Z",
+  "tg_cap_nhat": "2025-01-01T00:00:00Z"
+ },
+ {
+  "id": "lvl-2",
+  "ma_cap_bac": "L_02",
+  "ten_cap_bac": "Phó giám đốc",
+  "thu_tu": 2,
+  "luong_co_ban": 35000000,
+  "mo_ta": "Hỗ trợ Giám đốc điều hành các mảng được phân công.",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T00:00:00Z",
+  "tg_cap_nhat": "2025-01-01T00:00:00Z"
+ },
+ {
+  "id": "lvl-3",
+  "ma_cap_bac": "L_03",
+  "ten_cap_bac": "Trưởng phòng",
+  "thu_tu": 3,
+  "luong_co_ban": 25000000,
+  "mo_ta": "Quản lý trực tiếp các phòng ban chuyên môn.",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T00:00:00Z",
+  "tg_cap_nhat": "2025-01-01T00:00:00Z"
+ },
+ {
+  "id": "lvl-4",
+  "ma_cap_bac": "L_04",
+  "ten_cap_bac": "Nhân viên",
+  "thu_tu": 4,
+  "luong_co_ban": 12000000,
+  "mo_ta": "Nhân sự thực thi các công việc chuyên môn.",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T00:00:00Z",
+  "tg_cap_nhat": "2025-01-01T00:00:00Z"
+ }
+]

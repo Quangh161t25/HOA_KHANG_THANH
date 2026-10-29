@@ -1,0 +1,49 @@
+[
+ {
+  "id": "ktd-1",
+  "ma": "WEBSITE",
+  "ten": "Website công ty",
+  "thu_tu": 1,
+  "ghi_chu": "Tin đăng trên site",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ktd-2",
+  "ma": "LINKEDIN",
+  "ten": "LinkedIn",
+  "thu_tu": 2,
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ktd-3",
+  "ma": "REFERRAL",
+  "ten": "Giới thiệu nội bộ",
+  "thu_tu": 3,
+  "ghi_chu": "Nhân viên giới thiệu",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ktd-4",
+  "ma": "JOB_FAIR",
+  "ten": "Hội chợ việc làm",
+  "thu_tu": 4,
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ktd-5",
+  "ma": "VIEC_LAM_24H",
+  "ten": "Vieclam24h / Job board",
+  "thu_tu": 5,
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ }
+]

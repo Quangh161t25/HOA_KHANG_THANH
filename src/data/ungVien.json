@@ -1,0 +1,97 @@
+[
+ {
+  "id": "uv-1",
+  "ho_ten": "Nguyễn Văn A",
+  "email": "nguyenvana@email.com",
+  "so_dien_thoai": "0901234567",
+  "dia_chi": "Q.1, TP.HCM",
+  "ngay_sinh": "1995-05-15",
+  "ghi_chu_noi_bo": "Ưu tiên gọi lại sau Tết.",
+  "id_de_xuat_tuyen_dung": "dx-1",
+  "id_trang_thai_ung_vien": "ttuv-3",
+  "id_kenh_tuyen_dung": "ktd-1",
+  "ngay_phong_van_gan_nhat": "2025-02-10T09:00:00Z",
+  "ket_qua_phan_hoi_gan_nhat": "Đạt, chờ vòng 2",
+  "tai_lieu": [
+   {
+    "id": "tl-1",
+    "ten_file": "CV_Nguyen_Van_A.pdf",
+    "loai": "CV",
+    "link": "#"
+   },
+   {
+    "id": "tl-2",
+    "ten_file": "Bang_dai_hoc.pdf",
+    "loai": "Bằng cấp",
+    "link": "#"
+   }
+  ],
+  "tg_tao": "2025-01-15T10:00:00Z",
+  "tg_cap_nhat": "2025-02-10T14:00:00Z"
+ },
+ {
+  "id": "uv-2",
+  "ho_ten": "Trần Thị B",
+  "email": "tranthib@email.com",
+  "so_dien_thoai": "0912345678",
+  "dia_chi": null,
+  "ngay_sinh": null,
+  "ghi_chu_noi_bo": null,
+  "id_de_xuat_tuyen_dung": "dx-2",
+  "id_trang_thai_ung_vien": "ttuv-6",
+  "id_kenh_tuyen_dung": "ktd-3",
+  "ngay_phong_van_gan_nhat": "2025-01-25T14:00:00Z",
+  "ket_qua_phan_hoi_gan_nhat": "Trúng tuyển, đã gửi thư mời nhận việc",
+  "tai_lieu": [
+   {
+    "id": "tl-3",
+    "ten_file": "CV_Tran_Thi_B.pdf",
+    "loai": "CV",
+    "link": "#"
+   }
+  ],
+  "tg_tao": "2025-01-08T08:30:00Z",
+  "tg_cap_nhat": "2025-01-28T09:00:00Z"
+ },
+ {
+  "id": "uv-3",
+  "ho_ten": "Lê Văn C",
+  "email": "levanc@email.com",
+  "so_dien_thoai": "0987654321",
+  "dia_chi": "Q.7, TP.HCM",
+  "ngay_sinh": "1992-08-20",
+  "ghi_chu_noi_bo": null,
+  "id_de_xuat_tuyen_dung": "dx-1",
+  "id_trang_thai_ung_vien": "ttuv-1",
+  "id_kenh_tuyen_dung": "ktd-5",
+  "ngay_phong_van_gan_nhat": null,
+  "ket_qua_phan_hoi_gan_nhat": null,
+  "tai_lieu": [],
+  "tg_tao": "2025-02-01T11:00:00Z",
+  "tg_cap_nhat": "2025-02-01T11:00:00Z"
+ },
+ {
+  "id": "uv-4",
+  "ho_ten": "Phạm Thị D",
+  "email": "phamthid@email.com",
+  "so_dien_thoai": "0777123456",
+  "dia_chi": null,
+  "ngay_sinh": null,
+  "ghi_chu_noi_bo": "Đã từ chối lương thấp hơn kỳ vọng.",
+  "id_de_xuat_tuyen_dung": "dx-4",
+  "id_trang_thai_ung_vien": "ttuv-5",
+  "id_kenh_tuyen_dung": "ktd-2",
+  "ngay_phong_van_gan_nhat": "2025-01-18T10:00:00Z",
+  "ket_qua_phan_hoi_gan_nhat": "Từ chối",
+  "tai_lieu": [
+   {
+    "id": "tl-4",
+    "ten_file": "CV_Pham_Thi_D.pdf",
+    "loai": "CV",
+    "link": "#"
+   }
+  ],
+  "tg_tao": "2024-12-20T09:00:00Z",
+  "tg_cap_nhat": "2025-01-20T16:00:00Z"
+ }
+]

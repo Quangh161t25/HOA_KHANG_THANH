@@ -1,0 +1,42 @@
+[
+ {
+  "id": "ntl-1",
+  "ma": "VB_DEN",
+  "ten": "Văn bản đến",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ntl-2",
+  "ma": "VB_DI",
+  "ten": "Văn bản đi",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ntl-3",
+  "ma": "VB_NOI_BO",
+  "ten": "Văn bản nội bộ",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ntl-4",
+  "ma": "HD_NS",
+  "ten": "Hồ sơ nhân sự",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ntl-5",
+  "ma": "HD_TC",
+  "ten": "Hồ sơ tài chính",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ }
+]

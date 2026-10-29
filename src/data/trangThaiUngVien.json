@@ -1,0 +1,69 @@
+[
+ {
+  "id": "ttuv-1",
+  "ma": "MOI",
+  "ten": "Mới",
+  "thu_tu": 1,
+  "ghi_chu": "Ứng viên mới nộp hồ sơ",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ttuv-2",
+  "ma": "DANG_XEM",
+  "ten": "Đang xem xét",
+  "thu_tu": 2,
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ttuv-3",
+  "ma": "MOI_PV",
+  "ten": "Mời phỏng vấn",
+  "thu_tu": 3,
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ttuv-4",
+  "ma": "DA_PV",
+  "ten": "Đã phỏng vấn",
+  "thu_tu": 4,
+  "ghi_chu": "Chờ quyết định",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ttuv-5",
+  "ma": "TU_CHOI",
+  "ten": "Từ chối",
+  "thu_tu": 5,
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ttuv-6",
+  "ma": "NHAN_VIEC",
+  "ten": "Nhận việc",
+  "thu_tu": 6,
+  "loai_ket_qua": "onboard",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ },
+ {
+  "id": "ttuv-7",
+  "ma": "NGHI_VIEC",
+  "ten": "Nghỉ việc",
+  "thu_tu": 7,
+  "loai_ket_qua": "nghi",
+  "trang_thai": "Đang hoạt động",
+  "tg_tao": "2025-01-01T08:00:00Z",
+  "tg_cap_nhat": "2025-01-01T08:00:00Z"
+ }
+]
