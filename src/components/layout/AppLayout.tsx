@@ -15,6 +15,7 @@ import { HeaderClock } from './HeaderClock';
 import { NotificationBell } from './NotificationBell';
 import { MobileBottomNav } from './MobileBottomNav';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
+import { GoogleSheetsHeaderButton } from '@/components/google-sheets/GoogleSheetsHeaderButton';
 
 const SIDEBAR_OPEN = 240;
 const SIDEBAR_CLOSED = 64;
@@ -227,6 +228,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+            <GoogleSheetsHeaderButton />
             <HeaderClock />
             <NotificationBell />
             <div className="relative" ref={userMenuRef}>

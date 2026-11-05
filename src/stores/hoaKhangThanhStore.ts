@@ -25,6 +25,7 @@ import {
   DEFAULT_FIXED_EXPENSES,
 } from '@/data/mockHoaData';
 import { toInputDate, todayISODate } from '@/lib/format';
+import { recordOrderAudit } from './orderLogStore';
 
 // --- Flower Store ---
 interface FlowerState {
@@ -135,11 +136,11 @@ export const useDistributorStore = create<DistributorState>()(
 // --- Order Store ---
 interface OrderState {
   orders: Order[];
-  addOrder: (o: Omit<Order, 'id'>) => void;
-  updateOrder: (id: string, updates: Partial<Order>) => void;
-  updateOrderStatus: (id: string, status: Order['status']) => void;
-  updatePaymentStatus: (id: string, paymentStatus: Order['paymentStatus'], paidAmount?: number) => void;
-  deleteOrder: (id: string) => void;
+  addOrder: (o: Omit<Order, 'id'>, performer?: string) => void;
+  updateOrder: (id: string, updates: Partial<Order>, performer?: string) => void;
+  updateOrderStatus: (id: string, status: Order['status'], performer?: string) => void;
+  updatePaymentStatus: (id: string, paymentStatus: Order['paymentStatus'], paidAmount?: number, performer?: string) => void;
+  deleteOrder: (id: string, performer?: string) => void;
   resetOrders: () => void;
 }
 
@@ -147,7 +148,7 @@ export const useOrderStore = create<OrderState>()(
   persist(
     (set) => ({
       orders: INITIAL_ORDERS,
-      addOrder: (o) =>
+      addOrder: (o, performer) =>
         set((state) => {
           const totalQty = o.items.reduce((s, i) => s + (i.quantity || 0), 0);
           const subtotal = o.items.reduce((s, i) => s + (i.amount || 0), 0);
@@ -209,9 +210,16 @@ export const useOrderStore = create<OrderState>()(
             syncOrderToDebt(newOrder);
           }, 0);
 
+          // Ghi nhận lịch sử thao tác thêm mới đơn
+          recordOrderAudit({
+            action: 'create',
+            order: newOrder,
+            performer,
+          });
+
           return { orders: [newOrder, ...state.orders] };
         }),
-      updateOrder: (id, updates) =>
+      updateOrder: (id, updates, performer) =>
         set((state) => {
           const oldOrder = state.orders.find((o) => o.id === id);
           let targetUpdated: Order | undefined;
@@ -247,17 +255,44 @@ export const useOrderStore = create<OrderState>()(
             setTimeout(() => {
               syncOrderToDebt(ord, oldOrder?.code);
             }, 0);
+
+            // Ghi nhận lịch sử thao tác chỉnh sửa đơn
+            recordOrderAudit({
+              action: 'update',
+              order: ord,
+              oldOrder,
+              performer,
+            });
           }
 
           return { orders: updatedOrders };
         }),
-      updateOrderStatus: (id, status) =>
-        set((state) => ({
-          orders: state.orders.map((o) => (o.id === id ? { ...o, ...(status ? { status } : {}) } : o)),
-        })),
-      updatePaymentStatus: (id, paymentStatus, paidAmount) =>
+      updateOrderStatus: (id, status, performer) =>
+        set((state) => {
+          const oldOrder = state.orders.find((o) => o.id === id);
+          let targetUpdated: Order | undefined;
+          const updatedOrders = state.orders.map((o) => {
+            if (o.id !== id) return o;
+            const updated = { ...o, ...(status ? { status } : {}) };
+            targetUpdated = updated;
+            return updated;
+          });
+
+          if (targetUpdated && oldOrder && oldOrder.status !== status) {
+            recordOrderAudit({
+              action: 'status_change',
+              order: targetUpdated,
+              oldOrder,
+              performer,
+            });
+          }
+
+          return { orders: updatedOrders };
+        }),
+      updatePaymentStatus: (id, paymentStatus, paidAmount, performer) =>
         set((state) => {
           let targetUpdated: Order | undefined;
+          const oldOrder = state.orders.find((o) => o.id === id);
           const updatedOrders = state.orders.map((o) => {
             if (o.id !== id) return o;
             const updatedPaid = paidAmount !== undefined ? paidAmount : paymentStatus === 'paid' ? o.totalAmount : o.paidAmount;
@@ -276,17 +311,31 @@ export const useOrderStore = create<OrderState>()(
             setTimeout(() => {
               syncOrderToDebt(ord);
             }, 0);
+
+            recordOrderAudit({
+              action: 'update',
+              order: ord,
+              oldOrder,
+              performer,
+            });
           }
 
           return { orders: updatedOrders };
         }),
-      deleteOrder: (id) =>
+      deleteOrder: (id, performer) =>
         set((state) => {
           const oldOrder = state.orders.find((o) => o.id === id);
           if (oldOrder) {
             setTimeout(() => {
               removeOrderFromDebt(oldOrder.code, id, oldOrder.distributorId);
             }, 0);
+
+            // Ghi nhận lịch sử thao tác xóa đơn
+            recordOrderAudit({
+              action: 'delete',
+              order: oldOrder,
+              performer,
+            });
           }
           return { orders: state.orders.filter((o) => o.id !== id) };
         }),

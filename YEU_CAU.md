@@ -2,8 +2,8 @@
 
 > **Dự án:** Quản lý Phân phối Hoa Khang Thành  
 > **Thời gian bắt đầu ghi nhận:** 22:13:17 - 25/10/2026 (Giờ Việt Nam GMT+7)  
-> **Cập nhật gần nhất:** 14:48:00 - 29/10/2026  
-> **Tổng số yêu cầu:** 48 yêu cầu  
+> **Cập nhật gần nhất:** 18:30:00 - 05/11/2026  
+> **Tổng số yêu cầu:** 50 yêu cầu  
 > **Trạng thái:** Toàn bộ đã hoàn thành và được kiểm thử thành công (100%)
 
 ---
@@ -60,6 +60,8 @@
 | **46** | 14:54:00 - 26/10/2026 | Sửa lỗi công nợ theo ngày ở Chi tiết NPP (Lũy kế liên tục từng dòng, khớp thẻ KPI) & Mở rộng chiều rộng Drawer/bảng thông thoáng | NPP & Công nợ | Hoàn thành |
 | **47** | 14:25:00 - 29/10/2026 | Tích hợp API OCR Ocr4AI (`https://ocr.laychu.com/api-docs#models`): Engine OCR chuyên hóa đơn tiếng Việt siêu tốc (300-600ms), xuất bảng Markdown và bóc tách tự động vào Đơn hàng NCC | Đơn hàng NCC / OCR | Hoàn thành |
 | **48** | 14:42:00 - 29/10/2026 | Căn lề phải Drawer Đọc ảnh ra đơn, mở rộng kích thước siêu thoáng (76rem / 90rem / Toàn màn hình) và tích hợp bộ công cụ phóng to thu nhỏ & kéo di chuyển ảnh (Zoom & Pan) | Đơn hàng NCC / OCR | Hoàn thành |
+| **49** | 13:42:46 - 05/11/2026 | Bổ sung tab thứ 3 "Lịch sử thao tác" trong module Đơn hàng: Tự động ghi lại nhật ký Thêm mới, Chỉnh sửa, Xóa, Đổi trạng thái của từng nhân viên kèm đối chiếu dữ liệu thay đổi (Diff) và snapshot | Đơn hàng / Nhật ký | Hoàn thành |
+| **50** | 14:52:20 - 05/11/2026 | Kết nối hệ thống Web với Google Sheets (`HOA_KHANG_THANH`) qua Google Service Account: Tự động thiết kế và tạo lập 11 sheets chuẩn kế toán cho từng module, tích hợp đồng bộ 2 chiều (Push/Pull) và Auto-sync | Toàn hệ thống / Google Sheets | Hoàn thành |
 
 ---
 
@@ -1020,6 +1022,113 @@
   5. **Kiểm thử Kỹ thuật:**
      - TypeScript `tsc -b`: **Exit code 0** (0 lỗi).
      - Vite `npm run build`: **Biên dịch thành công 100%**.
+
+---
+
+### Yêu cầu 49: Bổ sung tab thứ 3 "Lịch sử thao tác" trong module Đơn hàng (Audit Log)
+- **Thời gian:** `13:42:46 - 05/11/2026`
+- **Nguyên văn yêu cầu:**
+  > *"modul đơn hàng thêm 1 tap lịch sử ở đây để lưu lại lịch sửa thao tác thêm sửa xóa của từng nhân viên."*
+  *(Kèm ảnh chụp màn hình vẽ khung đỏ chỉ định vị trí ngay bên phải tab "Báo cáo & Thống kê đơn")*
+- **Giải pháp & Triển khai:**
+  1. **Tạo mới Tab thứ 3 trên thanh Segmented Tabs ([`DonHangPage.tsx`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/src/modules/don-hang/DonHangPage.tsx)):**
+     - Mở rộng kiểu `type Tab = 'danhsach' | 'thongke' | 'lichsu'`.
+     - Thêm tab `{ id: 'lichsu', label: 'Lịch sử thao tác', icon: History }` đặt ngay cạnh `thongke`, đúng chính xác vị trí ô vuông đỏ người dùng khoanh trên ảnh giao diện.
+  2. **Xây dựng Hệ thống Ghi vết Thao tác (Order Audit Logging):**
+     - **Types ([`hoaKhangThanh.ts`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/src/types/hoaKhangThanh.ts)):**
+       - `OrderAuditAction`: `'create' | 'update' | 'delete' | 'status_change'`.
+       - `OrderAuditDiff`: Lưu danh sách trường thay đổi (`field`, `label`, `oldValue`, `newValue`).
+       - `OrderAuditLog`: Lưu chi tiết bản ghi (Mã log, ID đơn, Mã đơn, Thao tác, Thời gian, Nhân viên thực hiện, Mã NV, Chức vụ, Khách hàng, Tóm tắt, Nội dung chi tiết, Diff so sánh và Bản sao đối tượng snapshot).
+     - **Store Quản lý ([`orderLogStore.ts`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/src/stores/orderLogStore.ts)):**
+       - Tự động bắt vết danh tính nhân viên đang đăng nhập từ `useAuthStore` hoặc người tạo đơn `order.creator`.
+       - Tự động so sánh (calculate diff) chi tiết các trường bị sửa đổi giữa `oldOrder` và `order`: Trạng thái, NPP, Số lượng hoa, Thành tiền, Cước xe, Trừ hàng, Tổng tiền, Công nợ cũ, Thanh toán, Ghi chú, Mặt hàng hoa...
+       - Lưu trữ dữ liệu bền vững qua LocalStorage (`hkt-order-audit-logs-storage`).
+     - **Tích hợp Trigger Tự động vào Store ([`hoaKhangThanhStore.ts`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/src/stores/hoaKhangThanhStore.ts)):**
+       - Bất cứ khi nào gọi `addOrder()`, `updateOrder()`, `updateOrderStatus()`, `updatePaymentStatus()`, hoặc `deleteOrder()`, hệ thống tự động ghi nhật ký vào `useOrderLogStore`.
+  3. **Giao diện Phân hệ Lịch sử Thao tác ([`DonHangLichSu.tsx`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/src/modules/don-hang/DonHangLichSu.tsx)):**
+     - **5 Thẻ KPI Thống kê nhanh:**
+       - Tổng thao tác đã lưu.
+       - Thêm mới đơn (màu xanh ngọc).
+       - Chỉnh sửa đơn (màu xanh dương).
+       - Đổi trạng thái (màu tím indigo).
+       - Xóa đơn hàng (màu đỏ rose).
+     - **Thanh Công cụ Bộ lọc Tức thì:**
+       - Ô tìm kiếm linh hoạt: Tìm theo Mã đơn (`DH-2026-xxx`), Tên nhân viên, Mã nhân viên (`NV-xxx`), Tên khách hàng/NPP hoặc nội dung thao tác.
+       - Bộ lọc theo Loại thao tác: Tất cả, Thêm mới, Chỉnh sửa, Đổi trạng thái, Xóa đơn.
+       - Bộ lọc theo Nhân viên: Lọc riêng từng nhân viên trong hệ thống.
+       - Bộ lọc Mốc thời gian: Hôm nay, Hôm qua, 7 ngày qua, 30 ngày qua.
+     - **Bảng Dữ liệu Nhật ký Đầy đủ:**
+       - Cột Thời gian (`HH:mm:ss DD/MM/YYYY` kèm thời gian tương đối `(x phút trước)`).
+       - Cột Thao tác (Badge màu trực quan với icon tương ứng).
+       - Cột Nhân viên thực hiện (Avatar chữ cái đầu + Họ tên đậm + Mã NV + Chức vụ).
+       - Cột Mã đơn hàng (kèm nhãn `[Đã xóa]` nếu là đơn đã bị xóa khỏi hệ thống).
+       - Cột NPP / Khách hàng và Giá trị đơn hàng.
+       - Cột Chi tiết thay đổi (Hiển thị tóm tắt và các thẻ tag so sánh `Giá trị cũ → Giá trị mới`).
+       - Nút Xem chi tiết (`Eye`).
+     - **Hộp thoại Drawer Chi tiết Nhật ký (Audit Inspection):**
+       - Thẻ thông tin nhân viên thao tác.
+       - Thẻ thông tin đơn hàng liên quan.
+       - **Bảng đối chiếu thay đổi (Diff Table):** 3 cột trực quan (Trường thông tin | Giá trị trước | Giá trị sau khi sửa với màu đỏ/xanh rõ rệt).
+       - **Bảng danh sách mặt hàng hoa từ Snapshot:** Hiển thị trọn vẹn danh sách hoa, số lượng, đơn giá, thành tiền của đơn hàng lúc thao tác (kể cả đơn đã bị xóa vĩnh viễn).
+     - **Tiện ích Xuất file Excel & Quản trị:**
+       - Nút **Xuất Excel** chuẩn định dạng báo cáo kiểm toán doanh nghiệp.
+       - Nút **Dữ liệu mẫu** khôi phục nhanh nhật ký khởi tạo.
+       - Nút **Xóa nhật ký** có hộp thoại xác nhận bảo mật (`useConfirm`).
+  4. **Kiểm thử Kỹ thuật:**
+     - TypeScript `tsc -b`: **Exit code 0** (0 lỗi).
+     - Vite `npm run build`: **Biên dịch thành công 100%**.
+
+---
+
+### Yêu cầu 50: Kết nối Web với Google Sheets (Spreadsheet: HOA_KHANG_THANH) qua Google Service Account
+- **Thời gian:** `14:52:20 - 05/11/2026`
+- **Nguyên văn yêu cầu:**
+  > *"{ "type": "serviceaccount", "projectid": "h161-508101", "privatekeyid": "7394696a19771486f1368cfaafe5ffe6b8e9ab00", "privatekey": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n", "clientemail": "ca-nhan@h161-508101.iam.gserviceaccount.com", ... }*  
+  > *[HOA_KHANG_THANH - Google Trang tính](https://docs.google.com/spreadsheets/d/1iFYENcKF-9y5y_cfsmSjZyfbITMl1aIYwYgPL6i9vnQ/edit?gid=0#gid=0)*  
+  > *hãy kết nối web với gg sheet này. tự thiết kế các sheet cho từng modul và các cột ."*
+- **Giải pháp & Triển khai:**
+  1. **Tạo lập và Thiết kế 11 Sheets chuẩn kế toán trên Google Spreadsheet:**
+     - Đã chạy tiến trình kết nối Google Sheets API v4 bằng Google Service Account (`ca-nhan@h161-508101.iam.gserviceaccount.com`).
+     - Tự động xóa sheet mặc định `Trang tính1` và tạo mới **11 Sheets** tương ứng với từng module dữ liệu của hệ thống:
+       1. `DON_HANG` (19 cột): Mã đơn, Ngày đặt, NPP/Khách hàng, SĐT, Địa chỉ, SL hoa, Thành tiền, Cước xe, Trừ hàng, Tổng tiền, Công nợ cũ, Thanh toán, Đã thanh toán, Còn nợ đơn, Trạng thái, TT thanh toán, Người tạo, Ghi chú, Cập nhật lúc.
+       2. `CHI_TIET_DON_HANG` (12 cột): Mã đơn, Ngày đặt, Khách hàng, Mã hoa, Tên hoa, Số lượng, ĐVT, Giá vốn, Giá bán, Thành tiền vốn, Thành tiền bán, Lợi nhuận.
+       3. `DANH_SACH_HOA` (7 cột): Mã hoa, Tên hoa, Tên riêng, Đơn vị tính, Danh mục hoa, Trạng thái, Ghi chú.
+       4. `NHA_PHAN_PHOI` (14 cột): Mã NPP, Tên nhà phân phối, Người liên hệ, SĐT, Địa chỉ, Khu vực, Công nợ cũ, Tổng tiền mua, Đã trả, Công nợ hiện tại, Ngày lên đơn gần nhất, Số ngày chưa mua, Cảnh báo nợ, Trạng thái.
+       5. `NHA_CUNG_CAP` (11 cột): Mã NCC, Tên nhà cung cấp, Người đại diện, SĐT, Địa chỉ, Khu vực trồng, Công nợ cũ, Tổng tiền nhập, Đã trả NCC, Công nợ hiện tại, Trạng thái.
+       6. `DON_NHAP_NCC` (12 cột): Mã đơn nhập, Ngày nhập, NCC, Số lượng hoa, Tiền hàng, Cước xe, Tổng thanh toán, Đã trả NCC, Còn nợ, Trạng thái nhập, Người lập, Ghi chú.
+       7. `CONG_NO` (9 cột): Ngày ghi nhận, Đối tác, Loại đối tác (NPP/NCC), Loại giao dịch, Số tiền phát sinh, Công nợ lũy kế, Mã đơn liên quan, Người phụ trách, Ghi chú.
+       8. `THU_CHI` (9 cột): Mã phiếu, Ngày chứng từ, Loại phiếu (Thu/Chi), Hạng mục, Số tiền, Người nộp/nhận, Phương thức, Người lập, Ghi chú.
+       9. `TON_KHO` (9 cột): Mã hoa, Tên hoa, Đơn vị tính, Tồn đầu kỳ, Nhập trong kỳ, Xuất trong kỳ, Tồn cuối kỳ, Cảnh báo tồn, Vị trí kho.
+       10. `NHAN_VIEN` (11 cột): Mã nhân viên, Họ và tên, Tên đăng nhập, Chức vụ, Phòng ban, Quyền hạn, SĐT, Email, Ngày vào làm, Lương cơ bản, Trạng thái.
+       11. `LICH_SU_THAO_TAC` (10 cột): Mã log, Thời gian, Nhân viên thực hiện, Mã NV, Chức vụ, Thao tác, Mã đơn hàng, Khách hàng, Tóm tắt, Nội dung chi tiết thay đổi.
+     - **Quy chuẩn Định dạng Bảng tính:** Cố định hàng tiêu đề đầu tiên (`frozenRowCount: 1`), nền xanh đen Slate `#1e293b`, chữ trắng in đậm, căn giữa, đệm lề, gắn nhãn màu tab đặc trưng cho từng module, và tự động căn chỉnh độ rộng cột (`autoResizeDimensions`).
+  2. **Cấu hình & Tích hợp Tầng Máy chủ Backend / Proxy ([`googleSheetsPlugin.ts`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/src/server/googleSheetsPlugin.ts)):**
+     - Tạo plugin máy chủ Vite xử lý bảo mật ký RSA-SHA256 JWT bearer tự động cấp token OAuth2 Google trong 50 phút.
+     - Cung cấp các API:
+       - `GET /api/google-sheets/status`: Kiểm tra kết nối, trả về tiêu đề và thông tin các sheets.
+       - `POST /api/google-sheets/sync-all`: Nhận dữ liệu tất cả các store từ Web và thực thi `batchUpdate` ghi đồng thời lên 11 sheets trên Google Spreadsheet.
+       - `GET /api/google-sheets/pull-all`: `batchGet` tải toàn bộ dữ liệu mới nhất từ Google Sheets về Web.
+  3. **Tích hợp Tầng Khách hàng (Client Service & Store):**
+     - [`googleSheetsConfig.ts`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/src/config/googleSheetsConfig.ts): Đọc cấu hình Spreadsheet ID, link URL và Service Account credentials từ tệp môi trường `.env` (`import.meta.env` và `process.env`).
+     - [`.env`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/.env) & [`.env.example`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/.env.example): Lưu trữ toàn bộ khóa bí mật Service Account, Private Key, Client Email, Spreadsheet ID. Đã bổ sung `.env` vào [`.gitignore`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/.gitignore) để bảo mật tuyệt đối mã nguồn.
+     - [`googleSheetsService.ts`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/src/lib/googleSheetsService.ts): Bộ kết nối đồng bộ 2 chiều (Push và Pull).
+     - [`googleSheetsStore.ts`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/src/stores/googleSheetsStore.ts): Quản lý trạng thái kết nối, nhật ký đồng bộ, thời gian đồng bộ lần cuối và cơ chế tự động đồng bộ (Auto-sync).
+     - **Cơ chế Tự động Đồng bộ (Auto-sync Background):** Lắng nghe thay đổi tự động từ `useOrderStore`, `useFlowerStore`, `useDistributorStore`, `useSupplierStore`, `useCashStore` (debounce 2 giây) để tự động đẩy dữ liệu mới nhất lên Google Sheets mà không làm gián đoạn trải nghiệm người dùng.
+  4. **Giao diện Người dùng Đồng bộ Google Sheets:**
+     - **Nút bấm trên thanh Header ([`GoogleSheetsHeaderButton.tsx`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/src/components/google-sheets/GoogleSheetsHeaderButton.tsx)):**
+       - Đặt trên thanh điều hướng đầu trang cạnh đồng hồ hệ thống.
+       - Biểu tượng Google Sheets màu xanh ngọc kèm chấm xanh nhấp nháy báo hiệu kết nối trực tiếp thời gian thực.
+     - **Hộp thoại Quản lý Đồng bộ ([`GoogleSheetsModal.tsx`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/src/components/google-sheets/GoogleSheetsModal.tsx)):**
+       - Thẻ hiển thị trạng thái kết nối, tên bảng tính `HOA_KHANG_THANH`, Service Account email.
+       - Nút mở trực tiếp Google Sheets ra tab mới (`ExternalLink`).
+       - Nút **"Đồng bộ lên Google Sheets"** (Push) và **"Tải từ Google Sheets về Web"** (Pull).
+       - Nút gạt bật/tắt **"Tự động đồng bộ khi thao tác"** (Auto-sync).
+       - Danh sách trực quan 11 sheets kèm mô tả và số lượng cột chi tiết.
+       - Lịch sử nhật ký các lần gửi/nhận dữ liệu.
+  5. **Kiểm thử Kỹ thuật:**
+     - TypeScript `tsc -b`: **Exit code 0** (0 lỗi).
+     - Vite `npm run build`: **Biên dịch thành công 100%**.
+     - API Google Sheets: Đã khởi tạo thành công 11 sheets và nạp ban đầu 426 ô dữ liệu lên Google Spreadsheet.
 
 ---
 

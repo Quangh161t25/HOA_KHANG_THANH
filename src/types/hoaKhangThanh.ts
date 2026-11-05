@@ -229,3 +229,37 @@ export interface FixedExpensePreset {
   notes?: string;
   icon?: string;
 }
+
+// --- Lịch sử thao tác đơn hàng (Audit Log) ---
+export type OrderAuditAction = 'create' | 'update' | 'delete' | 'status_change';
+
+export interface OrderAuditDiff {
+  field: string;
+  label: string;
+  oldValue?: string | number;
+  newValue?: string | number;
+}
+
+export interface OrderAuditLog {
+  id: string;
+  orderId: string;
+  orderCode: string;
+  action: OrderAuditAction;
+  actionLabel: string;
+  performerId?: string;
+  performerName: string;
+  performerCode?: string;
+  performerRole?: string;
+  distributorId?: string;
+  distributorName: string;
+  timestamp: string; // ISO string
+  summary: string;
+  details: string;
+  itemsCount?: number;
+  totalQuantity?: number;
+  totalAmount?: number;
+  oldDebt?: number;
+  totalPayment?: number;
+  diff?: OrderAuditDiff[];
+  snapshot?: Partial<Order>;
+}

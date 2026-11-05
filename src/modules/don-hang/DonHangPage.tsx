@@ -5,6 +5,7 @@ import {
   ChartColumn,
   Coins,
   ExternalLink,
+  History,
   List,
   Plus,
   Printer,
@@ -28,9 +29,10 @@ import { useColumnSettings } from '@/hooks/useColumnSettings';
 import { DonHangFormModal } from './DonHangFormModal';
 import { DonHangDetailModal } from './DonHangDetailModal';
 import { DonHangStats } from './DonHangStats';
+import { DonHangLichSu } from './DonHangLichSu';
 import { HoaDonPrintModal, generateInvoiceUrl } from './HoaDonPrintModal';
 
-type Tab = 'danhsach' | 'thongke';
+type Tab = 'danhsach' | 'thongke' | 'lichsu';
 
 const INITIAL_COLUMNS: ColumnDef[] = [
   { id: 'code', label: 'ID đơn hàng', visible: true, minWidth: 110, width: 120, order: 0 },
@@ -560,19 +562,20 @@ export default function DonHangPage() {
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-background">
-      {/* Top Segmented Tabs: Danh sách | Thống kê */}
+      {/* Top Segmented Tabs: Danh sách | Thống kê | Lịch sử thao tác */}
       <div className="px-3 sm:px-4 pt-3 pb-1 shrink-0 bg-background">
         <Tabs<Tab>
           tabs={[
             { id: 'danhsach', label: 'Danh sách đơn hàng', icon: List },
             { id: 'thongke', label: 'Báo cáo & Thống kê đơn', icon: ChartColumn },
+            { id: 'lichsu', label: 'Lịch sử thao tác', icon: History },
           ]}
           activeTab={activeTab}
           onChange={setActiveTab}
         />
       </div>
 
-      {activeTab === 'danhsach' ? (
+      {activeTab === 'danhsach' && (
         <div className="flex-1 min-h-0 flex flex-col">
           {/* List Toolbar */}
           <ListToolbar
@@ -671,9 +674,17 @@ export default function DonHangPage() {
             />
           </div>
         </div>
-      ) : (
+      )}
+
+      {activeTab === 'thongke' && (
         <div className="flex-1 min-h-0 overflow-y-auto">
           <DonHangStats />
+        </div>
+      )}
+
+      {activeTab === 'lichsu' && (
+        <div className="flex-1 min-h-0 flex flex-col">
+          <DonHangLichSu />
         </div>
       )}
 
