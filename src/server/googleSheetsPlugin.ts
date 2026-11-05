@@ -240,14 +240,14 @@ export function googleSheetsPlugin(): Plugin {
               const rows = body.distributors.map((d) => [
                 d.code || '',
                 d.name || '',
-                d.contactPerson || '',
+                d.representative || '',
                 d.phone || '',
                 d.address || '',
                 d.region || '',
-                d.initialDebt || 0,
+                d.oldDebt || 0,
                 d.totalRevenue || 0,
-                d.paidAmount || 0,
-                d.currentDebt ?? ((d.initialDebt || 0) + (d.totalRevenue || 0) - (d.paidAmount || 0)),
+                d.collectedAmount || 0,
+                d.currentDebt ?? ((d.oldDebt || 0) + (d.totalRevenue || 0) - (d.collectedAmount || 0)),
                 d.lastOrderDate || '',
                 d.daysSinceLastOrder ? `${d.daysSinceLastOrder} ngày` : '',
                 d.isOverdue ? '⚠️ Quá hạn' : 'Bình thường',
@@ -267,11 +267,11 @@ export function googleSheetsPlugin(): Plugin {
                 s.contactPerson || '',
                 s.phone || '',
                 s.address || '',
-                s.region || '',
-                s.initialDebt || 0,
-                s.totalPurchases || 0,
+                s.specialties ? (Array.isArray(s.specialties) ? s.specialties.join(', ') : s.specialties) : '',
+                s.oldDebt || 0,
+                s.importAmount || 0,
                 s.paidAmount || 0,
-                s.currentDebt ?? ((s.initialDebt || 0) + (s.totalPurchases || 0) - (s.paidAmount || 0)),
+                s.totalDebt ?? ((s.oldDebt || 0) + (s.importAmount || 0) - (s.paidAmount || 0)),
                 s.status || 'Đang giao dịch',
               ]);
               batchData.push({
@@ -307,11 +307,11 @@ export function googleSheetsPlugin(): Plugin {
               const rows = body.debtRecords.map((r) => [
                 r.date || '',
                 r.partnerName || '',
-                r.partnerType === 'distributor' ? 'NPP' : 'NCC',
-                r.transactionType || '',
+                r.partnerType === 'npp' ? 'NPP' : 'NCC',
+                r.type || r.entryType || '',
                 r.amount || 0,
-                r.runningDebt || 0,
-                r.orderCode || '',
+                r.remainingDebt || r.finalDebt || 0,
+                r.referenceCode || '',
                 r.creator || '',
                 r.notes || '',
               ]);
@@ -329,7 +329,7 @@ export function googleSheetsPlugin(): Plugin {
                 t.type === 'income' ? 'Thu' : 'Chi',
                 t.category || '',
                 t.amount || 0,
-                t.payerOrReceiver || '',
+                t.partner || '',
                 t.paymentMethod || 'Tiền mặt',
                 t.creator || '',
                 t.notes || '',
@@ -346,16 +346,18 @@ export function googleSheetsPlugin(): Plugin {
                 inv.flowerCode || '',
                 inv.flowerName || '',
                 inv.unit || 'cành',
-                inv.openingStock || 0,
-                inv.importedStock || 0,
-                inv.exportedStock || 0,
-                inv.closingStock || 0,
-                inv.warning || 'Đủ hàng',
-                inv.location || 'Kho mát',
+                inv.currentStock || 0,
+                inv.minStock || 0,
+                inv.maxStock || 0,
+                inv.costPrice || 0,
+                inv.status === 'out' ? '🚫 Hết hàng' : inv.status === 'low' ? '⚠️ Sắp hết' : inv.status === 'excess' ? '📦 Dư hàng' : 'Đủ hàng',
+                inv.warehouse || 'Kho mát',
+                inv.lastImportDate || '',
+                inv.freshness || '',
               ]);
               batchData.push({
-                range: 'TON_KHO!A2:I' + Math.max(2, rows.length + 1),
-                values: rows.length > 0 ? rows : [['', '', '', '', '', '', '', '', '']],
+                range: 'TON_KHO!A2:K' + Math.max(2, rows.length + 1),
+                values: rows.length > 0 ? rows : [['', '', '', '', '', '', '', '', '', '', '']],
               });
             }
 
@@ -400,29 +402,44 @@ export function googleSheetsPlugin(): Plugin {
               });
             }
 
+            // Replace each supplied table atomically, including trailing old rows.
+            // Keep row 1 (headers) and formatting. Empty input clears all data rows.
+            const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const meta = await metaRes.json() as { sheets?: Array<{ properties: { sheetId: number; title: string; gridProperties: { rowCount: number; columnCount: number } } }> };
+            if (!metaRes.ok) return sendJson(500, { success: false, error: meta });
+            const requests: unknown[] = [];
+            for (const table of batchData) {
+              const title = table.range.split('!')[0];
+              const sheet = meta.sheets?.find((s) => s.properties.title === title)?.properties;
+              if (!sheet) throw new Error(`Không tìm thấy sheet ${title}`);
+              const requiredRows = table.values.length + 1;
+              if (requiredRows > sheet.gridProperties.rowCount) {
+                requests.push({ appendDimension: { sheetId: sheet.sheetId, dimension: 'ROWS', length: requiredRows - sheet.gridProperties.rowCount } });
+              }
+              requests.push({ updateCells: {
+                range: { sheetId: sheet.sheetId, startRowIndex: 1 },
+                rows: table.values.map((row) => ({ values: row.map((value) => ({
+                  userEnteredValue: typeof value === 'number' ? { numberValue: value } : { stringValue: String(value ?? '') },
+                })) })),
+                fields: 'userEnteredValue',
+              } });
+            }
             const updateRes = await fetch(
-              `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,
+              `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
               {
                 method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  valueInputOption: 'USER_ENTERED',
-                  data: batchData,
-                }),
-              }
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ requests }),
+              },
             );
-
-            const updateResult = (await updateRes.json()) as { totalUpdatedCells?: number; error?: unknown };
-            if (!updateRes.ok) {
-              return sendJson(500, { success: false, error: updateResult });
-            }
+            const updateResult = await updateRes.json();
+            if (!updateRes.ok) return sendJson(500, { success: false, error: updateResult });
 
             return sendJson(200, {
               success: true,
-              totalUpdatedCells: updateResult.totalUpdatedCells || 0,
+              totalUpdatedCells: batchData.reduce((sum, table) => sum + table.values.reduce((n, row) => n + row.length, 0), 0),
               updatedSheetsCount: batchData.length,
               timestamp: new Date().toISOString(),
             });
@@ -439,6 +456,10 @@ export function googleSheetsPlugin(): Plugin {
               'NHAN_VIEN!A2:K',
               'THU_CHI!A2:I',
               'TON_KHO!A2:I',
+              'CHI_TIET_DON_HANG!A2:L',
+              'DON_NHAP_NCC!A2:L',
+              'CONG_NO!A2:I',
+              'LICH_SU_THAO_TAC!A2:J',
             ];
 
             const rangeParam = ranges.map((r) => `ranges=${encodeURIComponent(r)}`).join('&');
@@ -450,6 +471,7 @@ export function googleSheetsPlugin(): Plugin {
             );
 
             const result = (await resData.json()) as { valueRanges?: Array<{ range: string; values?: any[][] }> };
+            if (!resData.ok) return sendJson(500, { success: false, error: result });
             return sendJson(200, { success: true, valueRanges: result.valueRanges || [] });
           }
 
