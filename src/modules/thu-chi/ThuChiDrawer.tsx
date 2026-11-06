@@ -94,24 +94,18 @@ export function ThuChiDrawer({ isOpen, onClose, transaction, mode: initialMode =
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!partner.trim()) {
-      toast.error('Vui lòng nhập đối tượng người nộp / nhận tiền');
-      return;
-    }
-    if (amount <= 0) {
-      toast.error('Số tiền phải lớn hơn 0');
-      return;
-    }
+    const finalPartner = partner.trim() || 'Khách vãng lai';
+    const finalAmount = amount || 0;
 
     if (mode === 'edit' && transaction) {
       updateTransaction(transaction.id, {
         code,
         type,
         category,
-        amount,
+        amount: finalAmount,
         date,
         paymentMethod,
-        partner,
+        partner: finalPartner,
         creator,
         notes,
       });
@@ -121,14 +115,14 @@ export function ThuChiDrawer({ isOpen, onClose, transaction, mode: initialMode =
         code,
         type,
         category,
-        amount,
+        amount: finalAmount,
         date,
         paymentMethod,
-        partner,
+        partner: finalPartner,
         creator,
         notes,
       });
-      toast.success(`Đã lưu phiếu ${code} số tiền ${amount.toLocaleString('vi-VN')}`);
+      toast.success(`Đã lưu phiếu ${code} số tiền ${finalAmount.toLocaleString('vi-VN')}`);
     }
 
     onClose();
@@ -266,7 +260,6 @@ export function ThuChiDrawer({ isOpen, onClose, transaction, mode: initialMode =
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs font-mono font-medium text-foreground"
-                required
               />
             </div>
 
@@ -277,7 +270,6 @@ export function ThuChiDrawer({ isOpen, onClose, transaction, mode: initialMode =
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground"
-                required
               />
             </div>
           </div>
@@ -315,7 +307,7 @@ export function ThuChiDrawer({ isOpen, onClose, transaction, mode: initialMode =
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Danh mục nghiệp vụ <span className="text-rose-500">*</span>
+              Danh mục nghiệp vụ
             </label>
             <select
               value={category}
@@ -332,18 +324,17 @@ export function ThuChiDrawer({ isOpen, onClose, transaction, mode: initialMode =
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Số tiền giao dịch (VNĐ) <span className="text-rose-500">*</span>
+              Số tiền giao dịch (VNĐ)
             </label>
             <input
               type="number"
-              min="1000"
+              min="0"
               step="500000"
               value={amount}
               onChange={(e) => setAmount(parseInt(e.target.value) || 0)}
               className={`w-full h-10 px-3 rounded-lg border border-border bg-background text-base font-extrabold focus:outline-none focus:ring-2 ${
                 type === 'income' ? 'text-emerald-600 focus:ring-emerald-500/20' : 'text-rose-600 focus:ring-rose-500/20'
               }`}
-              required
             />
           </div>
 
@@ -370,14 +361,13 @@ export function ThuChiDrawer({ isOpen, onClose, transaction, mode: initialMode =
                 value={creator}
                 onChange={(e) => setCreator(e.target.value)}
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground"
-                required
               />
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Đối tượng {type === 'income' ? 'nộp tiền (Đại lý / Khách)' : 'nhận tiền (NCC / Nhân viên)'} <span className="text-rose-500">*</span>
+              Đối tượng {type === 'income' ? 'nộp tiền (Đại lý / Khách)' : 'nhận tiền (NCC / Nhân viên)'}
             </label>
             <input
               type="text"
@@ -385,7 +375,6 @@ export function ThuChiDrawer({ isOpen, onClose, transaction, mode: initialMode =
               onChange={(e) => setPartner(e.target.value)}
               placeholder="VD: Chuỗi Shop Hoa FlowerBox hoặc Trang trại Hasfarm..."
               className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none"
-              required
             />
           </div>
 

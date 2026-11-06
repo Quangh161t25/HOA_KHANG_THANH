@@ -109,11 +109,6 @@ export function NhanVienDrawer({ isOpen, onClose, employee, mode: initialMode = 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim() || !phone.trim()) {
-      toast.error('Vui lòng nhập họ tên và số điện thoại');
-      return;
-    }
-
     const payload = {
       code,
       fullName,
@@ -357,13 +352,12 @@ export function NhanVienDrawer({ isOpen, onClose, employee, mode: initialMode = 
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="nguyenvana"
-                  required
                   className="w-full px-3 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary font-mono font-medium"
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-foreground mb-1">
-                  Mật khẩu đăng nhập *
+                  Mật khẩu đăng nhập
                 </label>
                 <div className="relative">
                   <input
@@ -371,7 +365,6 @@ export function NhanVienDrawer({ isOpen, onClose, employee, mode: initialMode = 
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Nhập mật khẩu (mặc định 123456)"
-                    required
                     className="w-full pl-3 pr-8 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary font-mono"
                   />
                   <button
@@ -421,18 +414,16 @@ export function NhanVienDrawer({ isOpen, onClose, employee, mode: initialMode = 
                 type="text"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                required
                 className="w-full px-3 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary font-mono"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1">Họ và tên *</label>
+              <label className="block text-xs font-medium text-foreground mb-1">Họ và tên</label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Nguyễn Văn A"
-                required
                 className="w-full px-3 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
@@ -440,13 +431,12 @@ export function NhanVienDrawer({ isOpen, onClose, employee, mode: initialMode = 
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1">Số điện thoại *</label>
+              <label className="block text-xs font-medium text-foreground mb-1">Số điện thoại</label>
               <input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="0901234567"
-                required
                 className="w-full px-3 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
@@ -464,7 +454,7 @@ export function NhanVienDrawer({ isOpen, onClose, employee, mode: initialMode = 
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1">Phòng ban *</label>
+              <label className="block text-xs font-medium text-foreground mb-1">Phòng ban</label>
               <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
@@ -478,13 +468,12 @@ export function NhanVienDrawer({ isOpen, onClose, employee, mode: initialMode = 
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1">Chức vụ / Vị trí *</label>
+              <label className="block text-xs font-medium text-foreground mb-1">Chức vụ / Vị trí</label>
               <input
                 type="text"
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
                 list="position-list"
-                required
                 className="w-full px-3 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <datalist id="position-list">

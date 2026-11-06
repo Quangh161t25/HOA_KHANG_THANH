@@ -183,7 +183,7 @@ export function TonKhoDrawer({ isOpen, onClose, inventoryItem, defaultType = 'im
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Chọn loại hoa <span className="text-rose-500">*</span>
+              Chọn loại hoa
             </label>
             <select
               value={flowerId}
@@ -205,15 +205,14 @@ export function TonKhoDrawer({ isOpen, onClose, inventoryItem, defaultType = 'im
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Số lượng {mode === 'import' ? 'nhập' : 'xuất'} ({currentFlower?.unit}) <span className="text-rose-500">*</span>
+                Số lượng {mode === 'import' ? 'nhập' : 'xuất'} ({currentFlower?.unit})
               </label>
               <input
                 type="number"
-                min="1"
+                min="0"
                 value={quantity}
                 onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs font-bold text-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none"
-                required
               />
             </div>
 

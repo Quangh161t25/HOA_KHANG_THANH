@@ -250,11 +250,6 @@ export function NPPDrawer({ isOpen, onClose, distributor, mode = 'create' }: Pro
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !phone.trim()) {
-      toast.error('Vui lòng nhập tên nhà phân phối và số điện thoại');
-      return;
-    }
-
     if (distributor && mode === 'edit') {
       updateDistributor(distributor.id, {
         code,
@@ -780,14 +775,13 @@ export function NPPDrawer({ isOpen, onClose, distributor, mode = 'create' }: Pro
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Mã NPP <span className="text-rose-500">*</span>
+                Mã NPP
               </label>
               <input
                 type="text"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs font-mono font-medium text-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none"
-                required
               />
             </div>
 
@@ -808,7 +802,7 @@ export function NPPDrawer({ isOpen, onClose, distributor, mode = 'create' }: Pro
 
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Tên Nhà phân phối / Shop hoa <span className="text-rose-500">*</span>
+                Tên Nhà phân phối / Shop hoa
               </label>
               <input
                 type="text"
@@ -816,7 +810,6 @@ export function NPPDrawer({ isOpen, onClose, distributor, mode = 'create' }: Pro
                 onChange={(e) => setName(e.target.value)}
                 placeholder="VD: Chuỗi Shop Hoa Tươi FlowerBox"
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none"
-                required
               />
             </div>
 
@@ -835,7 +828,7 @@ export function NPPDrawer({ isOpen, onClose, distributor, mode = 'create' }: Pro
 
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Số điện thoại <span className="text-rose-500">*</span>
+                Số điện thoại
               </label>
               <input
                 type="tel"
@@ -843,7 +836,6 @@ export function NPPDrawer({ isOpen, onClose, distributor, mode = 'create' }: Pro
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="0903 112 233"
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none"
-                required
               />
             </div>
 

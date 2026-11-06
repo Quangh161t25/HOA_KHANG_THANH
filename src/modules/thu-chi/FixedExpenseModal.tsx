@@ -38,25 +38,19 @@ export function FixedExpenseModal({ isOpen, onClose }: Props) {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      toast.error('Vui lòng nhập tên chi phí');
-      return;
-    }
-    if (amount <= 0) {
-      toast.error('Số tiền phải lớn hơn 0');
-      return;
-    }
+    const finalName = name.trim() || 'Chi phí nhanh';
+    const finalAmount = Number(amount) || 0;
 
     addPreset({
-      name: name.trim(),
-      amount: Number(amount),
+      name: finalName,
+      amount: finalAmount,
       category,
       paymentMethod: 'Tiền mặt',
-      notes: notes.trim() || `Chi tiền ${name.trim()}`,
+      notes: notes.trim() || `Chi tiền ${finalName}`,
       icon: 'zap',
     });
 
-    toast.success(`Đã thêm nút chi phí cố định "${name}" (${formatNumber(amount)})`);
+    toast.success(`Đã thêm nút chi phí cố định "${finalName}" (${formatNumber(finalAmount)})`);
     setName('');
     setAmount(50000);
     setNotes('');
@@ -133,7 +127,7 @@ export function FixedExpenseModal({ isOpen, onClose }: Props) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
                 <label className="text-[11px] font-semibold text-foreground mb-1 block">
-                  Tên nút (VD: Xăng xe, Cơm ca) *
+                  Tên nút (VD: Xăng xe, Cơm ca)
                 </label>
                 <input
                   type="text"
@@ -141,22 +135,20 @@ export function FixedExpenseModal({ isOpen, onClose }: Props) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full text-xs h-8 px-2.5 rounded-lg border border-input bg-card text-foreground"
-                  required
                 />
               </div>
               <div>
                 <label className="text-[11px] font-semibold text-foreground mb-1 block">
-                  Số tiền cố định *
+                  Số tiền cố định
                 </label>
                 <input
                   type="number"
                   step="5000"
-                  min="1000"
+                  min="0"
                   value={amount === 0 ? '' : amount}
                   onChange={(e) => setAmount(Number(e.target.value) || 0)}
                   placeholder="50000"
                   className="w-full text-xs h-8 px-2.5 rounded-lg border border-input bg-card font-mono text-foreground font-bold"
-                  required
                 />
               </div>
             </div>

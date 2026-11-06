@@ -246,31 +246,27 @@ export function CongNoDrawer({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPartner) {
-      toast.error('Vui lòng chọn đối tác đối soát công nợ');
-      return;
-    }
-    if (!date) {
-      toast.error('Vui lòng chọn ngày ghi nhận');
-      return;
-    }
-
     const numAmount = Number(amount) || 0;
     const numRemainingDebt = Number(remainingDebt) || 0;
+
+    const partnerId = selectedPartner?.id || 'partner-default';
+    const partnerCode = selectedPartner?.code || 'DT-001';
+    const partnerName = selectedPartner?.name || 'Đối tác chung';
+    const partnerPhone = selectedPartner?.phone;
 
     const payload: Partial<DebtDailyRecord> = {
       date,
       partnerType,
-      partnerId: selectedPartner.id,
-      partnerCode: selectedPartner.code,
-      partnerName: selectedPartner.name,
-      phone: selectedPartner.phone,
+      partnerId,
+      partnerCode,
+      partnerName,
+      phone: partnerPhone,
       entryType,
       type,
       amount: numAmount,
       remainingDebt: numRemainingDebt,
       // Backward compatibility fields
-      oldDebt: selectedPartner.currentDebt || 0,
+      oldDebt: selectedPartner?.currentDebt || 0,
       increaseAmount: type === 'chi' ? numAmount : 0,
       decreaseAmount: type === 'thu' ? numAmount : 0,
       finalDebt: numRemainingDebt,
@@ -385,7 +381,7 @@ export function CongNoDrawer({
         {/* Chọn đối tác */}
         <div>
           <label className="text-xs font-semibold text-foreground mb-1 block">
-            {partnerType === 'npp' ? 'Chọn Nhà Phân Phối (Đại lý)' : 'Chọn Nhà Cung Cấp (Nhà vườn)'} *
+            {partnerType === 'npp' ? 'Chọn Nhà Phân Phối (Đại lý)' : 'Chọn Nhà Cung Cấp (Nhà vườn)'}
           </label>
           {isView ? (
             <div className="p-3 bg-muted/40 rounded-lg border border-border text-xs">
@@ -398,7 +394,6 @@ export function CongNoDrawer({
               value={partnerId}
               onChange={(e) => handlePartnerChange(e.target.value)}
               className="w-full text-xs rounded-lg border border-input bg-card px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              required
             >
               <option value="" disabled>-- Chọn đối tác --</option>
               {partnerList.map((p) => (
@@ -507,7 +502,7 @@ export function CongNoDrawer({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-semibold text-foreground mb-1 flex items-center gap-1">
-              <Calendar size={13} className="text-primary" /> Ngày ghi nhận (dd/mm/yyyy) *
+              <Calendar size={13} className="text-primary" /> Ngày ghi nhận (dd/mm/yyyy)
             </label>
             {isView ? (
               <div className="p-2.5 bg-muted/40 rounded-lg border border-border text-xs font-mono font-bold text-foreground">
@@ -519,7 +514,6 @@ export function CongNoDrawer({
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 className="w-full text-xs rounded-lg border border-input bg-card px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono"
-                required
               />
             )}
           </div>
@@ -564,7 +558,7 @@ export function CongNoDrawer({
             {/* Số tiền */}
             <div>
               <label className="text-xs font-bold text-foreground mb-1 block">
-                Số tiền phát sinh *
+                Số tiền phát sinh
               </label>
               {isView ? (
                 <div className="p-2.5 bg-card rounded-lg border border-border text-sm font-mono font-extrabold text-foreground">
@@ -580,7 +574,6 @@ export function CongNoDrawer({
                     onChange={(e) => handleAmountChange(Number(e.target.value) || 0)}
                     placeholder="0"
                     className="w-full text-sm rounded-lg border border-input bg-card px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono font-bold"
-                    required
                   />
                   {amount > 0 && (
                     <p className="text-[11px] text-muted-foreground font-mono mt-1">

@@ -70,11 +70,6 @@ export function NCCDrawer({ isOpen, onClose, supplier, mode = 'create' }: Props)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !phone.trim()) {
-      toast.error('Vui lòng nhập tên nhà cung cấp và số điện thoại');
-      return;
-    }
-
     const specs = specialties
       .split(',')
       .map((s) => s.trim())
@@ -227,14 +222,13 @@ export function NCCDrawer({ isOpen, onClose, supplier, mode = 'create' }: Props)
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Mã NCC <span className="text-rose-500">*</span>
+                Mã NCC
               </label>
               <input
                 type="text"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs font-mono font-medium text-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none"
-                required
               />
             </div>
 
@@ -254,7 +248,7 @@ export function NCCDrawer({ isOpen, onClose, supplier, mode = 'create' }: Props)
 
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Tên Nhà cung cấp / Nhà vườn <span className="text-rose-500">*</span>
+                Tên Nhà cung cấp / Nhà vườn
               </label>
               <input
                 type="text"
@@ -262,7 +256,6 @@ export function NCCDrawer({ isOpen, onClose, supplier, mode = 'create' }: Props)
                 onChange={(e) => setName(e.target.value)}
                 placeholder="VD: Trang trại Hoa Hasfarm Đà Lạt"
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none"
-                required
               />
             </div>
 
@@ -281,7 +274,7 @@ export function NCCDrawer({ isOpen, onClose, supplier, mode = 'create' }: Props)
 
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Số điện thoại <span className="text-rose-500">*</span>
+                Số điện thoại
               </label>
               <input
                 type="text"
@@ -289,7 +282,6 @@ export function NCCDrawer({ isOpen, onClose, supplier, mode = 'create' }: Props)
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="0913 xxx xxx"
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground"
-                required
               />
             </div>
 

@@ -552,21 +552,11 @@ export function DonHangNCCFormModal({ isOpen, onClose, orderToEdit, initialItems
 
   // Submit
   const handleSave = () => {
-    if (!supplierName.trim()) {
-      toast.error('Vui lòng chọn hoặc nhập tên Nhà cung cấp / Nhà vườn');
-      return;
-    }
-
     const validItems = items.filter((i) => i.flowerName.trim() || i.flowerId);
-    if (validItems.length === 0) {
-      toast.error('Vui lòng thêm ít nhất một mặt hàng hoa vào đơn nhập');
-      return;
-    }
-
     const orderData: Omit<SupplierOrder, 'id'> = {
-      code,
+      code: code.trim() || `PO-NCC-${Date.now().toString().slice(-4)}`,
       supplierId: supplierId || undefined,
-      supplierName: supplierName.trim(),
+      supplierName: supplierName.trim() || 'NCC Vãng lai',
       phone: phone.trim() || undefined,
       address: address.trim() || undefined,
       orderDate,
@@ -693,7 +683,7 @@ export function DonHangNCCFormModal({ isOpen, onClose, orderToEdit, initialItems
             {/* Mã đơn */}
             <div>
               <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                ID Đơn nhập NCC <span className="text-rose-500">*</span>
+                ID Đơn nhập NCC
               </label>
               <input
                 type="text"
@@ -707,7 +697,7 @@ export function DonHangNCCFormModal({ isOpen, onClose, orderToEdit, initialItems
             {/* Nhà cung cấp */}
             <div className="relative">
               <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                Nhà cung cấp / Vườn hoa <span className="text-rose-500">*</span>
+                Nhà cung cấp / Vườn hoa
               </label>
               <div className="relative">
                 <input

@@ -76,21 +76,24 @@ export function HoaDrawer({ isOpen, onClose, flower, mode = 'create' }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. Kiểm tra tính hợp lệ và chống trùng tên hoa (không phân biệt chữ hoa, chữ thường)
-    const nameCheck = validateFlowerName(name, flower?.id, flowers);
-    if (!nameCheck.isValid) {
-      toast.error(nameCheck.error);
-      return;
+    const finalName = name.trim() || `Hoa mới ${code || Date.now()}`;
+
+    // 1. Kiểm tra tính hợp lệ và chống trùng tên hoa nếu có nhập tên
+    if (name.trim()) {
+      const nameCheck = validateFlowerName(finalName, flower?.id, flowers);
+      if (!nameCheck.isValid) {
+        toast.error(nameCheck.error);
+        return;
+      }
     }
 
     // 2. Kiểm tra tính hợp lệ và chống trùng tên riêng (kể cả chữ hoa chữ thường)
-    const aliasCheck = validateFlowerAliases(customName, flower?.id, flowers, name);
+    const aliasCheck = validateFlowerAliases(customName, flower?.id, flowers, finalName);
     if (!aliasCheck.isValid) {
       toast.error(aliasCheck.error);
       return;
     }
 
-    const finalName = name.trim();
     const finalCustomName = aliasCheck.cleanedCustomName;
 
     if (flower && mode === 'edit') {
@@ -218,20 +221,19 @@ export function HoaDrawer({ isOpen, onClose, flower, mode = 'create' }: Props) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Mã hoa <span className="text-rose-500">*</span>
+                Mã hoa
               </label>
               <input
                 type="text"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs font-mono font-medium text-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none"
-                required
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Chủng loại <span className="text-rose-500">*</span>
+                Chủng loại
               </label>
               <select
                 value={category}
@@ -248,7 +250,7 @@ export function HoaDrawer({ isOpen, onClose, flower, mode = 'create' }: Props) {
 
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-foreground mb-1">
-                Tên hoa tươi <span className="text-rose-500">*</span>
+                Tên hoa tươi
               </label>
               <input
                 type="text"
@@ -256,7 +258,6 @@ export function HoaDrawer({ isOpen, onClose, flower, mode = 'create' }: Props) {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="VD: Hoa Hồng Red Naomi Đà Lạt"
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none font-semibold"
-                required
               />
               <p className="text-[11px] text-muted-foreground mt-1">
                 * Tên hoa không được trùng nhau giữa các giống hoa (kể cả chữ hoa chữ thường).

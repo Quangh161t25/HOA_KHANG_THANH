@@ -836,23 +836,8 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!partnerName.trim()) {
-      toast.error('Vui lòng chọn hoặc nhập tên NPP / Khách hàng');
-      return;
-    }
-
     const validItems = items.filter((i) => i.flowerId && i.flowerName);
-    if (validItems.length === 0) {
-      toast.error('Vui lòng chọn ít nhất một mặt hàng hoa cho đơn hàng');
-      return;
-    }
-
     const hasZeroQty = validItems.some((i) => (i.quantity || 0) <= 0);
-    if (hasZeroQty) {
-      toast.error('Vui lòng nhập số lượng lớn hơn 0 cho các mặt hàng hoa');
-      return;
-    }
-
     // Nhắc nhở nếu khách chưa trả nợ đơn hàng quá 4 ngày
     if (debtCheck.hasOverdueUnpaidDebt && debtCheck.earliestUnpaidOrder) {
       const confirmMsg = `⚠️ CẢNH BÁO CÔNG NỢ:\nKhách hàng "${partnerName}" chưa trả nợ đơn hàng quá 4 ngày (${debtCheck.earliestUnpaidOrder.code} còn thiếu ${formatNumber(debtCheck.earliestUnpaidOrder.remainingDebt)}).\n\nBạn có chắc chắn muốn tiếp tục lên đơn hàng mới này không?`;
@@ -862,9 +847,9 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
     }
 
     const payload = {
-      code,
+      code: code.trim() || `DH-${Date.now().toString().slice(-4)}`,
       distributorId: isCustomPartner ? undefined : distributorId,
-      distributorName: partnerName,
+      distributorName: partnerName.trim() || 'Khách vãng lai',
       phone,
       creator,
       orderDate,
@@ -941,7 +926,7 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
               {/* ID đơn hàng */}
               <div>
                 <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                  ID đơn hàng <span className="text-rose-500">*</span>
+                  ID đơn hàng
                 </label>
                 <input
                   type="text"
@@ -949,7 +934,6 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="VD: DH-2026-001"
                   className="w-full h-8 px-2.5 rounded-lg border border-border bg-background text-xs font-mono font-bold text-primary focus:ring-1 focus:ring-primary focus:outline-none"
-                  required
                 />
               </div>
 
@@ -974,7 +958,7 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
               {/* Ngày đặt (Định dạng dd/mm/yyyy) */}
               <div>
                 <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                  Ngày đặt (dd/mm/yyyy) <span className="text-rose-500">*</span>
+                  Ngày đặt (dd/mm/yyyy)
                 </label>
                 <DateInputVN value={orderDate} onChange={setOrderDate} />
               </div>
@@ -1002,7 +986,7 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2.5 border-t border-border/50">
               <div className="sm:col-span-2">
                 <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                  NPP / Khách hàng <span className="text-rose-500">*</span>
+                  NPP / Khách hàng
                 </label>
                 {!isCustomPartner ? (
                   <div className="flex items-center gap-2">
@@ -1027,7 +1011,6 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
                       onChange={(e) => setPartnerName(e.target.value)}
                       placeholder="Nhập tên khách hàng mới..."
                       className="flex-1 h-8 px-2.5 rounded-lg border border-primary/50 bg-background text-xs font-semibold text-foreground focus:ring-1 focus:ring-primary"
-                      required
                       autoFocus
                     />
                     <Button
