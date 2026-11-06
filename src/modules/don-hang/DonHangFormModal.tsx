@@ -385,11 +385,11 @@ function DateInputVN({
             setText(dayjs(e.target.value).format('DD/MM/YYYY'));
           }
         }}
-        className="absolute right-0 top-0 w-8 h-8 opacity-0 cursor-pointer pointer-events-auto"
+        className="sr-only pointer-events-none"
         tabIndex={-1}
       />
-      <Calendar
-        size={14}
+      <button
+        type="button"
         onClick={() => {
           try {
             datePickerRef.current?.showPicker();
@@ -397,17 +397,21 @@ function DateInputVN({
             datePickerRef.current?.focus();
           }
         }}
-        className="absolute right-2.5 top-2.5 cursor-pointer text-muted-foreground hover:text-primary transition-colors pointer-events-none"
-      />
+        className="absolute right-0 top-0 w-8 h-8 flex items-center justify-center cursor-pointer text-muted-foreground hover:text-primary transition-colors"
+        title="Chọn ngày"
+        tabIndex={-1}
+      >
+        <Calendar size={14} />
+      </button>
     </div>
   );
 }
 
 export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
-  const { distributors } = useDistributorStore();
-  const { flowers } = useFlowerStore();
-  const { orders, addOrder, updateOrder } = useOrderStore();
-  const debtRecords = useDebtStore((s) => s.records);
+  const distributors = useDistributorStore((s) => s.distributors);
+  const flowers = useFlowerStore((s) => s.flowers);
+  const addOrder = useOrderStore((s) => s.addOrder);
+  const updateOrder = useOrderStore((s) => s.updateOrder);
 
   const [code, setCode] = useState('');
   const [distributorId, setDistributorId] = useState('');
@@ -427,21 +431,6 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
 
   // Items
   const [items, setItems] = useState<OrderItem[]>([]);
-  // Tự động tính lại công nợ cũ của đối tác tính đến đúng mốc ngày orderDate
-  useEffect(() => {
-    if (!orderToEdit && isOpen && partnerName) {
-      const debt = getDistributorDebtAsOfDate(
-        distributorId,
-        partnerName,
-        orderDate,
-        orders,
-        debtRecords,
-        distributors,
-      );
-      setOldDebt(debt);
-    }
-  }, [orderDate, distributorId, partnerName, isOpen, orderToEdit, orders, debtRecords, distributors]);
-
 
   // Thanh tìm kiếm nhanh & thêm hoa (Quick Add Bar)
   const [quickSearch, setQuickSearch] = useState('');
@@ -456,51 +445,65 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
   // 3 Tabs xem mặt hàng: 'tat_ca' (Full cột), 'gia_ban' (Hoa, SL, Giá bán, TT Bán), 'gia_nhap' (Hoa, SL, Giá nhập, TT Nhập)
   const [tableTab, setTableTab] = useState<'tat_ca' | 'gia_ban' | 'gia_nhap'>('tat_ca');
 
-  // Map tồn kho hoa để tra cứu nhanh
+  // Map tồn kho hoa để tra cứu nhanh O(1)
   const flowerStockMap = useMemo(() => {
     const map: Record<string, number> = {};
-    flowers.forEach((f) => {
+    for (let i = 0; i < flowers.length; i++) {
+      const f = flowers[i];
       map[f.id] = f.stock;
-    });
+    }
     return map;
   }, [flowers]);
 
-  // Map tra cứu tên riêng theo flowerId
+  // Map tra cứu tên riêng theo flowerId O(1)
   const flowerCustomNameMap = useMemo(() => {
     const map: Record<string, string> = {};
-    flowers.forEach((f) => {
+    for (let i = 0; i < flowers.length; i++) {
+      const f = flowers[i];
       if (f.customName) map[f.id] = f.customName;
-    });
+    }
     return map;
   }, [flowers]);
 
-  // Lọc hoa cho Quick Add (Tối đa đúng 10 gợi ý)
+  // Lọc hoa cho Quick Add (Chỉ tính khi mở quick search, tối đa 10 gợi ý)
   const quickFilteredFlowers = useMemo(() => {
+    if (!isQuickSearchOpen) return [];
     const q = quickSearch.toLowerCase().trim();
-    const list = !q
-      ? flowers
-      : flowers.filter(
-          (f) =>
-            f.name.toLowerCase().includes(q) ||
-            f.code.toLowerCase().includes(q) ||
-            (f.customName && f.customName.toLowerCase().includes(q))
-        );
-    return list.slice(0, 10);
-  }, [flowers, quickSearch]);
+    if (!q) return flowers.slice(0, 10);
+    const list: Flower[] = [];
+    for (let i = 0; i < flowers.length; i++) {
+      const f = flowers[i];
+      if (
+        f.name.toLowerCase().includes(q) ||
+        f.code.toLowerCase().includes(q) ||
+        (f.customName && f.customName.toLowerCase().includes(q))
+      ) {
+        list.push(f);
+        if (list.length >= 10) break;
+      }
+    }
+    return list;
+  }, [flowers, quickSearch, isQuickSearchOpen]);
 
-  // Lọc hoa cho Row Picker (Tối đa đúng 10 gợi ý)
+  // Lọc hoa cho Row Picker (Chỉ tính khi mở picker dòng, tối đa 10 gợi ý)
   const rowFilteredFlowers = useMemo(() => {
+    if (activeRowIdx === null) return [];
     const q = rowPickerSearch.toLowerCase().trim();
-    const list = !q
-      ? flowers
-      : flowers.filter(
-          (f) =>
-            f.name.toLowerCase().includes(q) ||
-            f.code.toLowerCase().includes(q) ||
-            (f.customName && f.customName.toLowerCase().includes(q))
-        );
-    return list.slice(0, 10);
-  }, [flowers, rowPickerSearch]);
+    if (!q) return flowers.slice(0, 10);
+    const list: Flower[] = [];
+    for (let i = 0; i < flowers.length; i++) {
+      const f = flowers[i];
+      if (
+        f.name.toLowerCase().includes(q) ||
+        f.code.toLowerCase().includes(q) ||
+        (f.customName && f.customName.toLowerCase().includes(q))
+      ) {
+        list.push(f);
+        if (list.length >= 10) break;
+      }
+    }
+    return list;
+  }, [flowers, rowPickerSearch, activeRowIdx]);
 
   // Click outside listener for Quick Add Dropdown
   useEffect(() => {
@@ -562,38 +565,31 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
       setCode(`DH-${year}-${num}`);
 
       const firstDist = distributors[0];
+      const today = new Date().toISOString().split('T')[0];
       setDistributorId(firstDist?.id || '');
       setPartnerName(firstDist?.name || 'Đại lý Hoa Sỉ');
       setIsCustomPartner(false);
       setPhone(firstDist?.phone || '0903 112 233');
       setCreator(CREATORS[0]);
-      setOrderDate(new Date().toISOString().split('T')[0]);
+      setOrderDate(today);
       setStatus('nhap');
       setNotes('');
       setShippingFee(0);
       setDiscount(0);
 
-      // Lấy công nợ hiện tại của đối tác (Running Balance chuẩn xác)
-      const partnerDebt = (() => {
-        if (!firstDist) return 0;
-        const debtRecords = useDebtStore.getState().records;
-        const pRecords = debtRecords.filter(
-          (r) =>
-            r.partnerType === 'npp' &&
-            (r.partnerId === firstDist.id ||
-              r.partnerName.trim().toLowerCase() === firstDist.name.trim().toLowerCase()),
-        );
-        let run = firstDist.oldDebt || 0;
-        const sorted = [...pRecords].sort((a, b) => a.date.localeCompare(b.date));
-        sorted.forEach((r) => {
-          const isThu = r.type === 'thu' || ((r.decreaseAmount || 0) > 0 && (r.increaseAmount || 0) === 0);
-          const amt = r.amount !== undefined ? r.amount : (isThu ? (r.decreaseAmount || 0) : (r.increaseAmount || 0));
-          run += isThu ? -amt : amt;
-        });
-        return run;
-      })();
+      // Lấy công nợ của đối tác tính đến ngày tạo đơn
+      const initialDebt = firstDist
+        ? getDistributorDebtAsOfDate(
+            firstDist.id,
+            firstDist.name,
+            today,
+            useOrderStore.getState().orders,
+            useDebtStore.getState().records,
+            distributors,
+          )
+        : 0;
 
-      setOldDebt(partnerDebt);
+      setOldDebt(initialDebt);
       setPaidAmount(0);
 
       // THÊM MỚI: ĐỂ TRỐNG Ô NHẬP HOA, SỐ LƯỢNG VÀ GIÁ ĐỂ NGƯỜI DÙNG TỰ NHẬP
@@ -614,17 +610,43 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
     }
   }, [orderToEdit, isOpen, distributors, flowers]);
 
+  // Xử lý thay đổi ngày đặt - Cập nhật ngay công nợ cũ của đối tác tính đến ngày đó trong 1 lượt render
+  const handleOrderDateChange = (newDate: string) => {
+    setOrderDate(newDate);
+    if (!orderToEdit && partnerName && !isCustomPartner) {
+      const debt = getDistributorDebtAsOfDate(
+        distributorId,
+        partnerName,
+        newDate,
+        useOrderStore.getState().orders,
+        useDebtStore.getState().records,
+        distributors,
+      );
+      setOldDebt(debt);
+    }
+  };
+
   // Kiểm tra công nợ quá hạn 4 ngày theo nguyên tắc FIFO (Đơn cũ nhất trả trước)
   const debtCheck = useMemo(() => {
+    if (!isOpen || !partnerName || isCustomPartner) {
+      return {
+        hasOverdueUnpaidDebt: false,
+        overdueOrders: [],
+        totalOverdueDebt: 0,
+        totalPastPaid: 0,
+        totalPastOrdersAmount: 0,
+        totalOverdueOrdersDebt: 0,
+      };
+    }
     return checkCustomerOverdueDebt(
-      isCustomPartner ? '' : distributorId,
+      distributorId,
       partnerName,
-      orders,
+      useOrderStore.getState().orders,
       orderToEdit?.id,
       orderDate,
-      debtRecords,
+      useDebtStore.getState().records,
     );
-  }, [isCustomPartner, distributorId, partnerName, orders, orderToEdit, orderDate, debtRecords]);
+  }, [isCustomPartner, distributorId, partnerName, orderDate, isOpen, orderToEdit?.id]);
 
   const handleDistributorChange = (val: string) => {
     if (val === '__custom__') {
@@ -641,23 +663,26 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
         setPartnerName(dist.name);
         setPhone(dist.phone);
 
-        // Lấy công nợ hiện tại chuẩn xác nhất của đối tác này theo Running Balance
-        const pRecords = debtRecords.filter(
-          (r) =>
-            r.partnerType === 'npp' &&
-            (r.partnerId === dist.id || r.partnerName.trim().toLowerCase() === dist.name.trim().toLowerCase()),
+        // Lấy công nợ của đối tác này tính tới ngày orderDate
+        const debt = getDistributorDebtAsOfDate(
+          dist.id,
+          dist.name,
+          orderDate,
+          useOrderStore.getState().orders,
+          useDebtStore.getState().records,
+          distributors,
         );
-        let run = dist.oldDebt || 0;
-        const sorted = [...pRecords].sort((a, b) => a.date.localeCompare(b.date));
-        sorted.forEach((r) => {
-          const isThu = r.type === 'thu' || ((r.decreaseAmount || 0) > 0 && (r.increaseAmount || 0) === 0);
-          const amt = r.amount !== undefined ? r.amount : (isThu ? (r.decreaseAmount || 0) : (r.increaseAmount || 0));
-          run += isThu ? -amt : amt;
-        });
-        setOldDebt(run);
+        setOldDebt(debt);
 
         // Kiểm tra ngay công nợ quá hạn 4 ngày và thông báo
-        const check = checkCustomerOverdueDebt(dist.id, dist.name, orders, orderToEdit?.id, orderDate, debtRecords);
+        const check = checkCustomerOverdueDebt(
+          dist.id,
+          dist.name,
+          useOrderStore.getState().orders,
+          orderToEdit?.id,
+          orderDate,
+          useDebtStore.getState().records,
+        );
         if (check.hasOverdueUnpaidDebt && check.earliestUnpaidOrder) {
           toast.warning(
             `⚠️ Chưa trả nợ: Khách ${dist.name} có đơn ${check.earliestUnpaidOrder.code} quá 4 ngày chưa thanh toán đủ (còn thiếu ${check.earliestUnpaidOrder.remainingDebt.toLocaleString('vi-VN')})!`,
@@ -975,7 +1000,7 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
                 <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                   Ngày đặt (dd/mm/yyyy)
                 </label>
-                <DateInputVN value={orderDate} onChange={setOrderDate} />
+                <DateInputVN value={orderDate} onChange={handleOrderDateChange} />
               </div>
 
               {/* Người lập đơn */}
@@ -1640,8 +1665,8 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
                           selectedDistributor.id,
                           selectedDistributor.name,
                           orderDate,
-                          orders,
-                          debtRecords,
+                          useOrderStore.getState().orders,
+                          useDebtStore.getState().records,
                           distributors,
                           orderToEdit?.id,
                         );

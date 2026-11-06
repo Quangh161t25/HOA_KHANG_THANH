@@ -22,18 +22,23 @@ export function getCanonicalPartnerKey(
 
   // 1. Tìm theo partnerId
   if (partnerId) {
-    const foundById = distributors.find(
-      (d) => d.id === partnerId || (d.code && d.code.toLowerCase() === partnerId.toLowerCase()),
-    );
-    if (foundById) return foundById.id;
+    const pIdLower = partnerId.toLowerCase();
+    for (let i = 0; i < distributors.length; i++) {
+      const d = distributors[i];
+      if (d.id === partnerId || (d.code && d.code.toLowerCase() === pIdLower)) {
+        return d.id;
+      }
+    }
   }
 
   // 2. Tìm theo partnerName
   if (normName) {
-    const foundByName = distributors.find(
-      (d) => d.name.trim().toLowerCase() === normName,
-    );
-    if (foundByName) return foundByName.id;
+    for (let i = 0; i < distributors.length; i++) {
+      const d = distributors[i];
+      if (d.name && d.name.trim().toLowerCase() === normName) {
+        return d.id;
+      }
+    }
   }
 
   // 3. Fallback: normalize name hoặc id
@@ -52,6 +57,24 @@ export function computeAllOrdersVirtualDebt(
 ): Map<string, OrderDebtInfo> {
   const result = new Map<string, OrderDebtInfo>();
 
+  // Map tra cứu nhanh O(1) để tránh vòng lặp quét qua distributors
+  const idToKey = new Map<string, string>();
+  const nameToKey = new Map<string, string>();
+
+  distributors.forEach((d) => {
+    idToKey.set(d.id, d.id);
+    if (d.code) idToKey.set(d.code.toLowerCase(), d.id);
+    if (d.name) nameToKey.set(d.name.trim().toLowerCase(), d.id);
+  });
+
+  const getFastKey = (id?: string, name?: string): string => {
+    if (id && idToKey.has(id)) return idToKey.get(id)!;
+    if (id && idToKey.has(id.toLowerCase())) return idToKey.get(id.toLowerCase())!;
+    const norm = (name || '').trim().toLowerCase();
+    if (norm && nameToKey.has(norm)) return nameToKey.get(norm)!;
+    return norm || (id ? id.trim().toLowerCase() : '');
+  };
+
   // 1. Gom nhóm danh sách đơn hàng và sổ công nợ theo từng Khách hàng / NPP (sử dụng Canonical Key)
   const partnerGroups = new Map<
     string,
@@ -69,25 +92,29 @@ export function computeAllOrdersVirtualDebt(
 
   // Gán đơn hàng vào đúng nhóm đối tác
   orders.forEach((o) => {
-    const pKey = getCanonicalPartnerKey(o.distributorId, o.distributorName, distributors);
+    const pKey = getFastKey(o.distributorId, o.distributorName);
     if (!pKey) return;
-    if (!partnerGroups.has(pKey)) {
+    let group = partnerGroups.get(pKey);
+    if (!group) {
       const foundDist = distributors.find((d) => d.id === pKey || d.name.trim().toLowerCase() === pKey);
-      partnerGroups.set(pKey, { dist: foundDist, orders: [], records: [] });
+      group = { dist: foundDist, orders: [], records: [] };
+      partnerGroups.set(pKey, group);
     }
-    partnerGroups.get(pKey)!.orders.push(o);
+    group.orders.push(o);
   });
 
   // Gán các bản ghi công nợ vào đúng nhóm đối tác
   debtRecords.forEach((r) => {
     if (r.partnerType !== 'npp') return;
-    const pKey = getCanonicalPartnerKey(r.partnerId, r.partnerName, distributors);
+    const pKey = getFastKey(r.partnerId, r.partnerName);
     if (!pKey) return;
-    if (!partnerGroups.has(pKey)) {
+    let group = partnerGroups.get(pKey);
+    if (!group) {
       const foundDist = distributors.find((d) => d.id === pKey || d.name.trim().toLowerCase() === pKey);
-      partnerGroups.set(pKey, { dist: foundDist, orders: [], records: [] });
+      group = { dist: foundDist, orders: [], records: [] };
+      partnerGroups.set(pKey, group);
     }
-    partnerGroups.get(pKey)!.records.push(r);
+    group.records.push(r);
   });
 
   // 2. Tính toán chuỗi lũy kế số dư thời gian cho từng khách hàng
@@ -95,9 +122,14 @@ export function computeAllOrdersVirtualDebt(
     const { dist, orders: pOrders, records: pRecords } = group;
     const baseDebt = dist?.oldDebt || 0;
 
+    if (pOrders.length === 0 && pRecords.length === 0) {
+      return;
+    }
+
     interface TimelineEntry {
       id: string;
       date: string;
+      dateTime: number;
       isThu: boolean;
       amount: number;
       paidAmount: number;
@@ -109,9 +141,11 @@ export function computeAllOrdersVirtualDebt(
 
     // Thêm các đơn hàng vào dòng thời gian
     pOrders.forEach((o) => {
+      const isoDate = normalizeToISODate(o.orderDate);
       allTimelineEntries.push({
         id: `order-${o.id}`,
-        date: normalizeToISODate(o.orderDate),
+        date: isoDate,
+        dateTime: parseDateTimestamp(isoDate) ?? 0,
         isThu: false,
         amount: o.totalAmount || 0,
         paidAmount: o.paidAmount || 0,
@@ -120,7 +154,7 @@ export function computeAllOrdersVirtualDebt(
       });
     });
 
-    // Thêm các giao dịch ngoài đơn hàng từ sổ công nợ (VD: phiếu thu trả nợ, phiếu chi điều chỉnh nợ)
+    // Thêm các giao dịch ngoài đơn hàng từ sổ công nợ
     const orderCodes = new Set(pOrders.map((o) => o.code));
     const orderIds = new Set(pOrders.map((o) => o.id));
 
@@ -130,7 +164,6 @@ export function computeAllOrdersVirtualDebt(
         (r.referenceCode && orderIds.has(r.referenceCode)) ||
         pOrders.some((o) => r.id === `debt-dh-${o.id}` || r.id === `debt-order-${o.id}`);
 
-      // Nếu bản ghi công nợ này tương ứng với 1 đơn hàng đã có trong pOrders, không cộng trùng
       if (isLinkedToOrder) return;
 
       const isThu = r.type === 'thu' || ((r.decreaseAmount || 0) > 0 && (r.increaseAmount || 0) === 0);
@@ -141,9 +174,11 @@ export function computeAllOrdersVirtualDebt(
           ? r.decreaseAmount || 0
           : r.increaseAmount || 0;
 
+      const isoDate = normalizeToISODate(r.date);
       allTimelineEntries.push({
         id: r.id,
-        date: normalizeToISODate(r.date),
+        date: isoDate,
+        dateTime: parseDateTimestamp(isoDate) ?? 0,
         isThu,
         amount: amt,
         paidAmount: 0,
@@ -152,10 +187,7 @@ export function computeAllOrdersVirtualDebt(
 
     // Sắp xếp dòng thời gian theo trình tự cũ nhất -> mới nhất
     allTimelineEntries.sort((a, b) => {
-      const tA = parseDateTimestamp(a.date) ?? 0;
-      const tB = parseDateTimestamp(b.date) ?? 0;
-      if (tA !== tB) return tA - tB;
-      // Cùng ngày: Bán hàng (phát sinh nợ) trước, Thu tiền (giảm nợ) sau
+      if (a.dateTime !== b.dateTime) return a.dateTime - b.dateTime;
       if (!a.isThu && b.isThu) return -1;
       if (a.isThu && !b.isThu) return 1;
       return (a.orderCode || a.id).localeCompare(b.orderCode || b.id, undefined, { numeric: true });
@@ -208,23 +240,31 @@ export function getDistributorDebtAsOfDate(
   let running = dist?.oldDebt || 0;
 
   const targetTime = targetDate ? (parseDateTimestamp(targetDate) ?? Infinity) : Infinity;
+  const pNameLower = (dist?.name || partnerName || '').trim().toLowerCase();
 
-  // Lấy đơn hàng của đối tác này
+  // Lấy đơn hàng của đối tác này bằng so khớp trực tiếp O(1)
   const pOrders = orders.filter((o) => {
     if (excludeOrderId && o.id === excludeOrderId) return false;
-    const key = getCanonicalPartnerKey(o.distributorId, o.distributorName, distributors);
-    return key === pKey;
+    if (o.distributorId === pKey) return true;
+    if (pNameLower && o.distributorName && o.distributorName.trim().toLowerCase() === pNameLower) return true;
+    return false;
   });
 
   // Lấy bản ghi công nợ của đối tác này
   const pRecords = debtRecords.filter((r) => {
     if (r.partnerType !== 'npp') return false;
-    const key = getCanonicalPartnerKey(r.partnerId, r.partnerName, distributors);
-    return key === pKey;
+    if (r.partnerId === pKey) return true;
+    if (pNameLower && r.partnerName && r.partnerName.trim().toLowerCase() === pNameLower) return true;
+    return false;
   });
+
+  if (pOrders.length === 0 && pRecords.length === 0) {
+    return running;
+  }
 
   interface TimelineEntry {
     date: string;
+    dateTime: number;
     isThu: boolean;
     amount: number;
     paidAmount: number;
@@ -234,8 +274,10 @@ export function getDistributorDebtAsOfDate(
   const entries: TimelineEntry[] = [];
 
   pOrders.forEach((o) => {
+    const isoDate = normalizeToISODate(o.orderDate);
     entries.push({
-      date: normalizeToISODate(o.orderDate),
+      date: isoDate,
+      dateTime: parseDateTimestamp(isoDate) ?? 0,
       isThu: false,
       amount: o.totalAmount || 0,
       paidAmount: o.paidAmount || 0,
@@ -262,8 +304,10 @@ export function getDistributorDebtAsOfDate(
         ? r.decreaseAmount || 0
         : r.increaseAmount || 0;
 
+    const isoDate = normalizeToISODate(r.date);
     entries.push({
-      date: normalizeToISODate(r.date),
+      date: isoDate,
+      dateTime: parseDateTimestamp(isoDate) ?? 0,
       isThu,
       amount: amt,
       paidAmount: 0,
@@ -271,18 +315,16 @@ export function getDistributorDebtAsOfDate(
   });
 
   entries.sort((a, b) => {
-    const tA = parseDateTimestamp(a.date) ?? 0;
-    const tB = parseDateTimestamp(b.date) ?? 0;
-    if (tA !== tB) return tA - tB;
+    if (a.dateTime !== b.dateTime) return a.dateTime - b.dateTime;
     if (!a.isThu && b.isThu) return -1;
     if (a.isThu && !b.isThu) return 1;
     return (a.orderCode || '').localeCompare(b.orderCode || '', undefined, { numeric: true });
   });
 
-  for (const entry of entries) {
-    const entryTime = parseDateTimestamp(entry.date) ?? 0;
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
     // Chỉ tính các giao dịch diễn ra trước hoặc trong cùng ngày (nhưng trước đơn đang tạo)
-    if (entryTime > targetTime) {
+    if (entry.dateTime > targetTime) {
       break;
     }
     if (entry.isThu) {

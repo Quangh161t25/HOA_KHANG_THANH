@@ -97,16 +97,12 @@ export function checkCustomerOverdueDebt(
   // 1. Lọc các đơn hàng trước đó của khách hàng này (loại trừ đơn hàng đang tạo / sửa hiện tại)
   const pastOrders = allOrders.filter((o) => {
     if (currentOrderId && o.id === currentOrderId) return false;
-    const matchId = Boolean(customerId && o.distributorId === customerId);
-    const orderCustomer = (o.distributorName || '').trim().toLowerCase();
-    const matchName = Boolean(
-      cleanName &&
-        orderCustomer &&
-        (orderCustomer === cleanName ||
-          orderCustomer.includes(cleanName) ||
-          cleanName.includes(orderCustomer)),
-    );
-    return matchId || matchName;
+    if (customerId && o.distributorId === customerId) return true;
+    if (cleanName && o.distributorName) {
+      const orderCustomer = o.distributorName.trim().toLowerCase();
+      if (orderCustomer === cleanName) return true;
+    }
+    return false;
   });
 
   // Lấy các bản ghi công nợ từ useDebtStore
@@ -118,14 +114,10 @@ export function checkCustomerOverdueDebt(
   const orderCodes = new Set(pastOrders.map((o) => o.code));
   const debtStorePayments = allDebtRecords.filter((r) => {
     if (r.partnerType !== 'npp') return false;
-    const matchId = Boolean(customerId && r.partnerId === customerId);
-    const rName = (r.partnerName || '').trim().toLowerCase();
-    const matchName = Boolean(
-      cleanName &&
-        rName &&
-        (rName === cleanName || rName.includes(cleanName) || cleanName.includes(rName)),
-    );
-    if (!matchId && !matchName) return false;
+    let match = false;
+    if (customerId && r.partnerId === customerId) match = true;
+    else if (cleanName && r.partnerName && r.partnerName.trim().toLowerCase() === cleanName) match = true;
+    if (!match) return false;
 
     // Khoản thanh toán: có type === 'thu' hoặc decreaseAmount > 0
     const isThu = r.type === 'thu' || (r.decreaseAmount !== undefined && r.decreaseAmount > 0);
@@ -154,14 +146,11 @@ export function checkCustomerOverdueDebt(
   // 2. Tìm thêm các khoản nợ thủ công (nếu có trong useDebtStore với type === 'chi' không thuộc đơn hàng nào)
   const manualDebtRecords = allDebtRecords.filter((r) => {
     if (r.partnerType !== 'npp') return false;
-    const matchId = Boolean(customerId && r.partnerId === customerId);
-    const rName = (r.partnerName || '').trim().toLowerCase();
-    const matchName = Boolean(
-      cleanName &&
-        rName &&
-        (rName === cleanName || rName.includes(cleanName) || cleanName.includes(rName)),
-    );
-    if (!matchId && !matchName) return false;
+    let match = false;
+    if (customerId && r.partnerId === customerId) match = true;
+    else if (cleanName && r.partnerName && r.partnerName.trim().toLowerCase() === cleanName) match = true;
+    if (!match) return false;
+
     const isDebt = r.type === 'chi' || (r.increaseAmount !== undefined && r.increaseAmount > 0);
     if (!isDebt) return false;
     if (r.referenceCode && orderCodes.has(r.referenceCode)) return false;
