@@ -19,16 +19,17 @@ export function useColumnSettings(storageKey: string, initialColumns: ColumnDef[
         const parsed: ColumnDef[] = JSON.parse(saved);
         const initialMap = new Map(initialColumns.map((c) => [c.id, c]));
 
-        // Hợp nhất dữ liệu đã lưu với cấu hình cột mặc định (giữ label và thuộc tính mới)
-        const merged: ColumnDef[] = parsed.map((p) => {
-          const init = initialMap.get(p.id);
-          if (!init) return p;
-          return {
-            ...init,
-            ...p,
-            label: init.label, // luôn dùng nhãn mới nhất
-          };
-        });
+        // Hợp nhất dữ liệu đã lưu với cấu hình cột mặc định (giữ label và thuộc tính mới, loại bỏ các cột đã bị xóa)
+        const merged: ColumnDef[] = parsed
+          .filter((p) => initialMap.has(p.id))
+          .map((p) => {
+            const init = initialMap.get(p.id)!;
+            return {
+              ...init,
+              ...p,
+              label: init.label, // luôn dùng nhãn mới nhất
+            };
+          });
 
         // Bổ sung các cột mới trong code nếu storage chưa có
         const parsedIds = new Set(parsed.map((p) => p.id));

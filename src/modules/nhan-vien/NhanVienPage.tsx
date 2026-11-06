@@ -9,8 +9,7 @@ import {
   EyeOff,
   KeyRound,
   List,
-  LogIn,
-  Phone,
+Phone,
   Plus,
   SquarePen,
   Trash2,
@@ -35,20 +34,19 @@ type Tab = 'danhsach' | 'thongke' | 'lichsu';
 
 const INITIAL_COLUMNS: ColumnDef[] = [
   { id: 'code', label: 'Mã NV', visible: true, minWidth: 90, width: 100, order: 0 },
-  { id: 'fullName', label: 'Họ và tên', visible: true, minWidth: 160, width: 190, order: 1 },
-  { id: 'account', label: 'Tài khoản & Mật khẩu', visible: true, minWidth: 190, width: 230, order: 2 },
-  { id: 'phone', label: 'Số điện thoại', visible: true, minWidth: 120, width: 130, order: 3 },
-  { id: 'department', label: 'Phòng ban', visible: true, minWidth: 140, width: 160, order: 4 },
-  { id: 'position', label: 'Vị trí công việc', visible: true, minWidth: 140, width: 170, order: 5 },
-  { id: 'salary', label: 'Lương cơ bản', visible: true, minWidth: 120, width: 130, order: 6 },
-  { id: 'joinDate', label: 'Ngày vào làm', visible: true, minWidth: 100, width: 110, order: 7 },
-  { id: 'status', label: 'Trạng thái', visible: true, minWidth: 110, width: 120, order: 8 },
-  { id: 'actions', label: 'Thao tác', visible: true, minWidth: 90, width: 90, order: 9 },
+  { id: 'fullName', label: 'Họ và tên', visible: true, minWidth: 150, width: 180, order: 1 },
+  { id: 'username', label: 'Tài khoản', visible: true, minWidth: 120, width: 140, order: 2 },
+  { id: 'password', label: 'Mật khẩu', visible: true, minWidth: 130, width: 150, order: 3 },
+  { id: 'role', label: 'Quyền hạn', visible: true, minWidth: 130, width: 150, order: 4 },
+  { id: 'phone', label: 'Số điện thoại', visible: true, minWidth: 120, width: 130, order: 5 },
+  { id: 'joinDate', label: 'Ngày vào làm', visible: true, minWidth: 100, width: 110, order: 6 },
+  { id: 'status', label: 'Trạng thái', visible: true, minWidth: 110, width: 120, order: 7 },
+  { id: 'actions', label: 'Thao tác', visible: true, minWidth: 80, width: 85, order: 8 },
 ];
 
 export default function NhanVienPage() {
   const { employees, deleteEmployee } = useEmployeeStore();
-  const { user: currentUser, loginAsEmployee } = useAuthStore();
+  const { user: currentUser } = useAuthStore();
   const [activeTab, setActiveTab] = useState<Tab>('danhsach');
   const [searchTerm, setSearchTerm] = useState('');
   const [showPassMap, setShowPassMap] = useState<Record<string, boolean>>({});
@@ -174,13 +172,6 @@ export default function NhanVienPage() {
     e.stopPropagation();
     setShowPassMap((p) => ({ ...p, [id]: !p[id] }));
   };
-
-  const handleQuickLogin = (row: Employee, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    loginAsEmployee(row);
-    toast.success(`Đã đăng nhập bằng tài khoản: ${row.fullName} (${row.position || 'Nhân viên'})`);
-  };
-
   const renderCell = (columnId: string, row: Employee) => {
     switch (columnId) {
       case 'code':
@@ -205,58 +196,52 @@ export default function NhanVienPage() {
             </div>
           </div>
         );
-      case 'account': {
-        const isOnline = currentUser?.id === row.id;
-        const isRevealed = !!showPassMap[row.id];
+      case 'username': {
         const username = row.username || row.code.toLowerCase().replace('-', '');
+        const isOnline = currentUser?.id === row.id;
+        return (
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-xs font-bold text-foreground bg-muted/70 px-2 py-0.5 rounded border border-border/60">
+              {username}
+            </span>
+            {isOnline && (
+              <span className="inline-flex items-center text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-400 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800">
+                Online
+              </span>
+            )}
+          </div>
+        );
+      }
+      case 'password': {
+        const isRevealed = !!showPassMap[row.id];
         const password = row.password || '123456';
         return (
-          <div className="flex flex-col gap-1 py-0.5" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-mono text-xs font-bold text-foreground bg-muted/70 px-1.5 py-0.5 rounded border border-border/60">
-                {username}
-              </span>
-              {row.role === 'admin' ? (
-                <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 dark:text-indigo-400 px-1.5 py-0.2 rounded border border-indigo-200 dark:border-indigo-800">
-                  Admin
-                </span>
-              ) : (
-                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.2 rounded">
-                  NV
-                </span>
-              )}
-              {isOnline && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-400 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800">
-                  Online
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="inline-flex items-center gap-1 text-[11px] font-mono text-muted-foreground bg-background px-1.5 py-0.5 rounded border border-border">
-                <KeyRound size={11} className="text-muted-foreground/70" />
-                <span className="font-semibold text-foreground tracking-wider">{isRevealed ? password : '••••••'}</span>
-                <button
-                  type="button"
-                  onClick={(e) => toggleShowPass(row.id, e)}
-                  className="p-0.5 hover:text-foreground text-muted-foreground/70 transition-colors ml-0.5"
-                  title={isRevealed ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                >
-                  {isRevealed ? <EyeOff size={11} /> : <Eye size={11} />}
-                </button>
-              </div>
-              {!isOnline && (
-                <button
-                  type="button"
-                  onClick={(e) => handleQuickLogin(row, e)}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium rounded text-primary hover:bg-primary/10 border border-primary/20 transition-colors"
-                  title="Đăng nhập tài khoản này"
-                >
-                  <LogIn size={11} />
-                  <span>Đăng nhập</span>
-                </button>
-              )}
-            </div>
+          <div className="inline-flex items-center gap-1.5 text-xs font-mono text-muted-foreground bg-background px-2 py-0.5 rounded border border-border" onClick={(e) => e.stopPropagation()}>
+            <KeyRound size={12} className="text-muted-foreground/70 shrink-0" />
+            <span className="font-semibold text-foreground tracking-wider">{isRevealed ? password : '••••••'}</span>
+            <button
+              type="button"
+              onClick={(e) => toggleShowPass(row.id, e)}
+              className="p-0.5 hover:text-foreground text-muted-foreground/70 transition-colors ml-1"
+              title={isRevealed ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+            >
+              {isRevealed ? <EyeOff size={13} /> : <Eye size={13} />}
+            </button>
           </div>
+        );
+      }
+      case 'role': {
+        const isAdmin = row.role === 'admin';
+        return (
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${
+              isAdmin
+                ? 'text-indigo-700 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800'
+                : 'text-slate-700 bg-slate-100 border-slate-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700'
+            }`}
+          >
+            {isAdmin ? 'Quản trị viên (Admin)' : 'Nhân viên'}
+          </span>
         );
       }
       case 'phone':
@@ -266,17 +251,6 @@ export default function NhanVienPage() {
             {row.phone}
           </a>
         );
-      case 'department':
-        return (
-          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-            <Briefcase size={12} />
-            {row.department}
-          </span>
-        );
-      case 'position':
-        return <span className="text-xs font-medium text-foreground">{row.position}</span>;
-      case 'salary':
-        return <span className="text-xs font-semibold text-foreground font-mono">{formatNumber(row.salary)}</span>;
       case 'joinDate':
         return (
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-mono">
@@ -369,16 +343,15 @@ export default function NhanVienPage() {
               {isRevealed ? <EyeOff size={11} /> : <Eye size={11} />}
             </button>
           </div>
-          {!isOnline && (
-            <button
-              type="button"
-              onClick={(e) => handleQuickLogin(row, e)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground border border-primary/20 transition-all"
-            >
-              <LogIn size={11} />
-              <span>Đăng nhập</span>
-            </button>
-          )}
+          <span
+            className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+              row.role === 'admin'
+                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
+                : 'bg-muted text-muted-foreground'
+            }`}
+          >
+            {row.role === 'admin' ? 'Admin' : 'Nhân viên'}
+          </span>
         </div>
 
         <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
