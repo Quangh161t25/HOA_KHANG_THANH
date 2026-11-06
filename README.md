@@ -77,3 +77,22 @@ GOOGLE_CLIENT_EMAIL=ca-nhan@h161-508101.iam.gserviceaccount.com
 GOOGLE_PROJECT_ID=h161-508101
 GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
+
+
+## Google Sheets trên Vercel
+
+Các API `/api/google-sheets/status`, `/api/google-sheets/sync-all` và
+`/api/google-sheets/pull-all` chạy bằng Vercel Functions và dùng chung xử lý với Vite.
+
+Trong Vercel → Project → Settings → Environment Variables, cấu hình:
+
+- `GOOGLE_PRIVATE_KEY`: khóa riêng của service account (chỉ đặt phía server, không dùng tiền tố `VITE_`). Hỗ trợ xuống dòng thật hoặc chuỗi `\n`.
+- `GOOGLE_CLIENT_EMAIL`: email service account được cấp quyền Editor trên bảng tính.
+- `VITE_GOOGLE_SPREADSHEET_ID`: ID bảng tính đích.
+
+Sau khi thay đổi biến môi trường, redeploy rồi mở Google Sheets trên thanh đầu trang
+để kiểm tra trạng thái kết nối. Bật tự động đồng bộ hoặc chọn đẩy dữ liệu lên Sheets.
+Dữ liệu nhập trong trình duyệt được giữ lại khi cập nhật bản sửa đồng bộ.
+
+Khóa riêng từng được đặt trong code đã được loại bỏ. Thay khóa đó trong Google Cloud
+và cập nhật `GOOGLE_PRIVATE_KEY` trên Vercel; không đưa khóa mới vào Git.

@@ -24,3 +24,14 @@ if (typeof window !== 'undefined' && localStorage.getItem(resetKey) !== 'done') 
   localStorage.setItem('hkt-debts-cleared-clean-v2', 'true');
   localStorage.setItem(resetKey, 'done');
 }
+
+// Restore sync once for installations affected by the owner's reset.
+// Do not change the reset key or clear any newly entered business records.
+const syncRepairKey = 'hkt-sync-restored-2026-11-06-v1';
+if (typeof window !== 'undefined' && localStorage.getItem(syncRepairKey) !== 'done') {
+  const key = 'hkt-google-sheets-storage';
+  const saved = JSON.parse(localStorage.getItem(key) || '{"state":{},"version":0}');
+  saved.state = { ...saved.state, autoSync: true };
+  localStorage.setItem(key, JSON.stringify(saved));
+  localStorage.setItem(syncRepairKey, 'done');
+}

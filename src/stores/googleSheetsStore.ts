@@ -114,7 +114,7 @@ export const useGoogleSheetsStore = create<GoogleSheetsState>()(
                 ...state.syncLogs.slice(0, 49),
               ],
             }));
-            if (!isBackground) {
+            {
               toast.error(`Đồng bộ thất bại: ${result.error}`);
             }
             return false;
@@ -133,7 +133,7 @@ export const useGoogleSheetsStore = create<GoogleSheetsState>()(
               ...state.syncLogs.slice(0, 49),
             ],
           }));
-          if (!isBackground) {
+          {
             toast.error(`Lỗi: ${err?.message}`);
           }
           return false;
@@ -233,6 +233,15 @@ export function initGoogleSheetsAutoSync() {
       if (useGoogleSheetsStore.getState().autoSync) syncToSheets(true);
     }, 2000);
   };
+
+  const hasLocalData = [
+    useOrderStore.getState().orders, useFlowerStore.getState().flowers,
+    useDistributorStore.getState().distributors, useSupplierStore.getState().suppliers,
+    useCashStore.getState().transactions, useDebtStore.getState().records,
+    useInventoryStore.getState().inventory, useEmployeeStore.getState().employees,
+    useSupplierOrderStore.getState().orders,
+  ].some((rows) => rows.length > 0);
+  if (hasLocalData) handleStoreChange();
 
   useOrderStore.subscribe(handleStoreChange);
   useFlowerStore.subscribe(handleStoreChange);
