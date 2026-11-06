@@ -118,26 +118,6 @@ export async function checkGoogleSheetsConnection(): Promise<GoogleSheetsStatus>
 /**
  * Đẩy toàn bộ dữ liệu từ các store trên Web lên 11 sheets của Google Spreadsheet
  */
-function sortForGoogleSheets<T extends { orderDate?: string; date?: string; id?: string }>(items: T[]): T[] {
-  return [...items].sort((a, b) => {
-    const valA = a.orderDate || a.date;
-    const valB = b.orderDate || b.date;
-    const parse = (v: any) => {
-      if (!v) return 0;
-      const s = String(v).trim();
-      const iso = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-      if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])).getTime();
-      const vn = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
-      if (vn) return new Date(Number(vn[3]), Number(vn[2]) - 1, Number(vn[1])).getTime();
-      const p = Date.parse(s);
-      return isNaN(p) ? 0 : p;
-    };
-    const tA = parse(valA);
-    const tB = parse(valB);
-    if (tA !== tB) return tA - tB; // Bé tới lớn: cũ ở hàng trên, mới thêm ở HÀNG DƯỚI CÙNG
-    return (a.id || '').localeCompare(b.id || '', undefined, { numeric: true });
-  });
-}
 
 export async function syncAllToGoogleSheets(): Promise<SyncResult> {
   try {
@@ -162,13 +142,13 @@ export async function syncAllToGoogleSheets(): Promise<SyncResult> {
     ].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
     const payload = {
-      orders: sortForGoogleSheets(orders),
+      orders,
       flowers,
       distributors,
       suppliers,
-      supplierOrders: sortForGoogleSheets(supplierOrders),
-      debtRecords: sortForGoogleSheets(debtRecords),
-      transactions: sortForGoogleSheets(transactions),
+      supplierOrders,
+      debtRecords,
+      transactions,
       inventory,
       employees,
       auditLogs,
@@ -443,62 +423,70 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
       counts['cong_no'] = records.length;
     }
 
-    // --- 8. DON_HANG (tái tạo từ header, không có items) ---
-    // Columns: code, orderDate, distributorName, phone, shippingAddress, totalQty,
-    //          subtotal, shippingFee, discount, totalAmount, oldDebt, totalPayment, paidAmount, remaining, status, paymentStatus, creator, notes
+    // --- 8. DON_HANG ---
+    // Giữ nguyên thứ tự dòng của Google Sheets (hàng cũ ở trên, hàng mới thêm ở dưới cùng)
     const donHangRows = sheetMap['DON_HANG'] || [];
-    // Chỉ pull nếu local không có đơn hàng nào (tránh ghi đè đơn đang có items)
-    const localOrders = useOrderStore.getState().orders;
-    if (donHangRows.length > 0 && localOrders.length === 0) {
-      const orders: Order[] = donHangRows.filter((r) => r[0] && r[1]).map((r, idx) => ({
-        id: `dh-sync-${idx + 1}`,
-        code: String(r[0] || '').trim(),
-        orderDate: String(r[1] || '').trim(),
-        distributorName: String(r[2] || '').trim(),
-        phone: String(r[3] || '').trim(),
-        address: String(r[4] || '').trim(),
-        totalQuantity: parseSheetNumber(r[5]) || 0,
-        itemsSubtotal: parseSheetNumber(r[6]) || 0,
-        shippingFee: parseSheetNumber(r[7]) || 0,
-        discount: parseSheetNumber(r[8]) || 0,
-        totalAmount: parseSheetNumber(r[9]) || 0,
-        oldDebt: parseSheetNumber(r[10]) || 0,
-        totalPayment: parseSheetNumber(r[11]) || 0,
-        paidAmount: parseSheetNumber(r[12]) || 0,
-        debtAmount: parseSheetNumber(r[13]) || 0,
-        status: (String(r[14] || 'nhap').trim()) as Order['status'],
-        paymentStatus: (String(r[15] || 'unpaid').trim()) as Order['paymentStatus'],
-        creator: String(r[16] || '').trim(),
-        notes: String(r[17] || '').trim(),
-        items: [],
-      }));
+    if (donHangRows.length > 0) {
+      const existingOrders = useOrderStore.getState().orders;
+      const existingOrderMap = new Map(existingOrders.map((o) => [o.code, o]));
+      const orders: Order[] = donHangRows.filter((r) => r[0] && r[1]).map((r, idx) => {
+        const code = String(r[0] || '').trim();
+        const prev = existingOrderMap.get(code);
+        return {
+          id: prev?.id || `dh-sync-${idx + 1}`,
+          code,
+          orderDate: String(r[1] || '').trim(),
+          distributorName: String(r[2] || '').trim(),
+          phone: String(r[3] || '').trim() || prev?.phone || '',
+                    address: String(r[4] || '').trim() || prev?.address || '',
+          totalQuantity: parseSheetNumber(r[5]) || prev?.totalQuantity || 0,
+          itemsSubtotal: parseSheetNumber(r[6]) || prev?.itemsSubtotal || 0,
+          shippingFee: parseSheetNumber(r[7]) || prev?.shippingFee || 0,
+          discount: parseSheetNumber(r[8]) || prev?.discount || 0,
+          totalAmount: parseSheetNumber(r[9]) || prev?.totalAmount || 0,
+          oldDebt: parseSheetNumber(r[10]) || prev?.oldDebt || 0,
+          totalPayment: parseSheetNumber(r[11]) || prev?.totalPayment || 0,
+          paidAmount: parseSheetNumber(r[12]) || prev?.paidAmount || 0,
+          debtAmount: parseSheetNumber(r[13]) || prev?.debtAmount || 0,
+          status: (String(r[14] || prev?.status || 'nhap').trim()) as Order['status'],
+          paymentStatus: (String(r[15] || prev?.paymentStatus || 'unpaid').trim()) as Order['paymentStatus'],
+          creator: String(r[16] || '').trim() || prev?.creator || '',
+          notes: String(r[17] || '').trim() || prev?.notes || '',
+          items: prev?.items || [],
+          updatedAt: prev?.updatedAt,
+        };
+      });
       useOrderStore.setState({ orders });
       counts['don_hang'] = orders.length;
     }
 
     // --- 9. DON_NHAP_NCC ---
-    // Columns: code, orderDate, supplierName, totalQuantity, totalAmount, shippingFee, finalAmount, paidAmount, remaining, status, creator, notes
     const donNhapRows = sheetMap['DON_NHAP_NCC'] || [];
-    const localSupplierOrders = useSupplierOrderStore.getState().orders;
-    if (donNhapRows.length > 0 && localSupplierOrders.length === 0) {
-      const supplierOrders: SupplierOrder[] = donNhapRows.filter((r) => r[0] && r[1]).map((r, idx) => ({
-        id: `po-sync-${idx + 1}`,
-        code: String(r[0] || '').trim(),
-        orderDate: String(r[1] || '').trim(),
-        supplierName: String(r[2] || '').trim(),
-        totalQuantity: parseSheetNumber(r[3]) || 0,
-        itemsSubtotal: parseSheetNumber(r[4]) || 0,
-        shippingFee: parseSheetNumber(r[5]) || 0,
-        discount: 0,
-        totalAmount: parseSheetNumber(r[6]) || 0,
-        paidAmount: parseSheetNumber(r[7]) || 0,
-        debtAmount: parseSheetNumber(r[8]) || 0,
-        status: (String(r[9] || 'nhap').trim()) as SupplierOrder['status'],
-        paymentStatus: 'unpaid' as SupplierOrder['paymentStatus'],
-        creator: String(r[10] || '').trim(),
-        notes: String(r[11] || '').trim(),
-        items: [],
-      }));
+    if (donNhapRows.length > 0) {
+      const existingSupplierOrders = useSupplierOrderStore.getState().orders;
+      const existingSupplierOrderMap = new Map(existingSupplierOrders.map((o) => [o.code, o]));
+      const supplierOrders: SupplierOrder[] = donNhapRows.filter((r) => r[0] && r[1]).map((r, idx) => {
+        const code = String(r[0] || '').trim();
+        const prev = existingSupplierOrderMap.get(code);
+        return {
+          id: prev?.id || `po-sync-${idx + 1}`,
+          code,
+          orderDate: String(r[1] || '').trim(),
+          supplierName: String(r[2] || '').trim(),
+          totalQuantity: parseSheetNumber(r[3]) || prev?.totalQuantity || 0,
+          itemsSubtotal: parseSheetNumber(r[4]) || prev?.itemsSubtotal || 0,
+          shippingFee: parseSheetNumber(r[5]) || prev?.shippingFee || 0,
+          discount: 0,
+          totalAmount: parseSheetNumber(r[6]) || prev?.totalAmount || 0,
+          paidAmount: parseSheetNumber(r[7]) || prev?.paidAmount || 0,
+          debtAmount: parseSheetNumber(r[8]) || prev?.debtAmount || 0,
+          status: (String(r[9] || prev?.status || 'nhap').trim()) as SupplierOrder['status'],
+          paymentStatus: 'unpaid' as SupplierOrder['paymentStatus'],
+          creator: String(r[10] || '').trim() || prev?.creator || '',
+          notes: String(r[11] || '').trim() || prev?.notes || '',
+          items: prev?.items || [],
+        };
+      });
       useSupplierOrderStore.setState({ orders: supplierOrders });
       counts['don_nhap_ncc'] = supplierOrders.length;
     }

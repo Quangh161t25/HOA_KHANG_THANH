@@ -67,27 +67,6 @@ export async function getGoogleSheetsAccessToken(): Promise<string> {
   return cachedToken;
 }
 
-function sortByDateAsc(items?: any[]): any[] {
-  if (!items || !items.length) return [];
-  return [...items].sort((a, b) => {
-    const valA = a.orderDate || a.date;
-    const valB = b.orderDate || b.date;
-    const parse = (v: any) => {
-      if (!v) return 0;
-      const s = String(v).trim();
-      const iso = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-      if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])).getTime();
-      const vn = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
-      if (vn) return new Date(Number(vn[3]), Number(vn[2]) - 1, Number(vn[1])).getTime();
-      const p = Date.parse(s);
-      return isNaN(p) ? 0 : p;
-    };
-    const tA = parse(valA);
-    const tB = parse(valB);
-    if (tA !== tB) return tA - tB;
-    return (a.id || a.code || '').localeCompare(b.id || b.code || '', undefined, { numeric: true });
-  });
-}
 
 export async function googleSheetsHandler(req: IncomingMessage & { body?: unknown }, res: ServerResponse) {
   if (!req.url?.startsWith('/api/google-sheets')) {
@@ -180,8 +159,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
 
       // 1. DON_HANG
       if (body.orders) {
-        const sortedOrders = sortByDateAsc(body.orders);
-        const rows = sortedOrders.map((o) => {
+        const rows = body.orders.map((o) => {
           const totalQty = (o.items || []).reduce((s: number, i: any) => s + (i.quantity || 0), 0);
           const subtotal = o.itemsSubtotal ?? (o.items || []).reduce((s: number, i: any) => s + (i.amount || 0), 0);
           const totalAmt = o.totalAmount ?? (subtotal + (o.shippingFee || 0) - (o.discount || 0));
@@ -221,7 +199,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
 
         // 2. CHI_TIET_DON_HANG
         const detailRows: any[][] = [];
-        sortedOrders.forEach((o) => {
+        body.orders.forEach((o) => {
           (o.items || []).forEach((item: any) => {
             detailRows.push([
               o.code || '',
