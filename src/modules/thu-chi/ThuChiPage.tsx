@@ -24,7 +24,7 @@ import type { ColumnDef } from '@/stores/createListStore';
 import { useColumnSettings } from '@/hooks/useColumnSettings';
 import { useCashStore, useFixedExpenseStore } from '@/stores/hoaKhangThanhStore';
 import type { CashTransaction, FixedExpensePreset } from '@/types/hoaKhangThanh';
-import { formatDate, todayISODate } from '@/lib/format';
+import { formatDate, todayISODate, parseDateTimestamp } from '@/lib/format';
 import { ThuChiDrawer } from './ThuChiDrawer';
 import { ThuChiStats } from './ThuChiStats';
 import { FixedExpenseModal } from './FixedExpenseModal';
@@ -110,6 +110,11 @@ export default function ThuChiPage() {
       const matchMethod = selectedMethods.length === 0 || selectedMethods.includes(t.paymentMethod);
 
       return matchSearch && matchType && matchMethod;
+    }).sort((a, b) => {
+      const tA = parseDateTimestamp(a.date) ?? 0;
+      const tB = parseDateTimestamp(b.date) ?? 0;
+      if (tB !== tA) return tB - tA; // Lớn tới bé
+      return (b.code || '').localeCompare(a.code || '', undefined, { numeric: true });
     });
   }, [transactions, searchTerm, selectedTypes, selectedMethods]);
 
@@ -415,6 +420,7 @@ export default function ThuChiPage() {
 
           <div className="flex-1 min-h-0">
             <DataTable<CashTransaction>
+              defaultSort={{ column: 'date', direction: 'desc' }}
               data={filteredData}
               columns={columns}
               selectedIds={selectedIds}

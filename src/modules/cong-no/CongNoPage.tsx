@@ -1234,6 +1234,7 @@ export default function CongNoPage() {
           {/* Main DataTable */}
           <div className="flex-1 min-h-0 overflow-hidden">
             <DataTable<DebtDailyRecord>
+              defaultSort={{ column: 'date', direction: 'desc' }}
               data={filteredData}
               columns={columns}
               isLoading={false}

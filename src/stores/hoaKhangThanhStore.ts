@@ -33,7 +33,7 @@ export const useFlowerStore = create<FlowerState>()(
       flowers: [],
       addFlower: (flower) =>
         set((state) => ({
-          flowers: [{ ...flower, id: `fl-${Date.now()}` }, ...state.flowers],
+          flowers: [...state.flowers, { ...flower, id: `fl-${Date.now()}` }],
         })),
       updateFlower: (id, updates) =>
         set((state) => ({
@@ -207,7 +207,7 @@ export const useOrderStore = create<OrderState>()(
             performer,
           });
 
-          return { orders: [newOrder, ...state.orders] };
+          return { orders: [...state.orders, newOrder] };
         }),
       updateOrder: (id, updates, performer) =>
         set((state) => {
@@ -432,7 +432,7 @@ export const useEmployeeStore = create<EmployeeState>()(
       employees: [],
       addEmployee: (e) =>
         set((state) => ({
-          employees: [{ ...e, id: `nv-${Date.now()}` }, ...state.employees],
+          employees: [...state.employees, { ...e, id: `nv-${Date.now()}` }],
         })),
       updateEmployee: (id, updates) =>
         set((state) => ({
@@ -463,7 +463,7 @@ export const useCashStore = create<CashState>()(
       transactions: [],
       addTransaction: (t) =>
         set((state) => ({
-          transactions: [{ ...t, id: `tc-${Date.now()}` }, ...state.transactions],
+          transactions: [...state.transactions, { ...t, id: `tc-${Date.now()}` }],
         })),
       updateTransaction: (id, updates) =>
         set((state) => ({
@@ -523,7 +523,7 @@ export const useDebtStore = create<DebtState>()(
               recalcSupplierDebts(r.partnerId);
             }
           }, 0);
-          return { records: [newRecord, ...state.records] };
+          return { records: [...state.records, newRecord] };
         }),
       updateRecord: (id, updates) =>
         set((state) => {
@@ -660,7 +660,7 @@ export const useSupplierOrderStore = create<SupplierOrderState>()(
             syncSupplierOrderToDebt(newOrder);
           }, 0);
 
-          return { orders: [newOrder, ...state.orders] };
+          return { orders: [...state.orders, newOrder] };
         }),
       updateOrder: (id, updates) =>
         set((state) => {

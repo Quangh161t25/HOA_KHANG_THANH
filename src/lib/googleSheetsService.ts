@@ -118,6 +118,27 @@ export async function checkGoogleSheetsConnection(): Promise<GoogleSheetsStatus>
 /**
  * Đẩy toàn bộ dữ liệu từ các store trên Web lên 11 sheets của Google Spreadsheet
  */
+function sortForGoogleSheets<T extends { orderDate?: string; date?: string; id?: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const valA = a.orderDate || a.date;
+    const valB = b.orderDate || b.date;
+    const parse = (v: any) => {
+      if (!v) return 0;
+      const s = String(v).trim();
+      const iso = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+      if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])).getTime();
+      const vn = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+      if (vn) return new Date(Number(vn[3]), Number(vn[2]) - 1, Number(vn[1])).getTime();
+      const p = Date.parse(s);
+      return isNaN(p) ? 0 : p;
+    };
+    const tA = parse(valA);
+    const tB = parse(valB);
+    if (tA !== tB) return tA - tB; // Bé tới lớn: cũ ở hàng trên, mới thêm ở HÀNG DƯỚI CÙNG
+    return (a.id || '').localeCompare(b.id || '', undefined, { numeric: true });
+  });
+}
+
 export async function syncAllToGoogleSheets(): Promise<SyncResult> {
   try {
     const orders = useOrderStore.getState().orders;
@@ -141,13 +162,13 @@ export async function syncAllToGoogleSheets(): Promise<SyncResult> {
     ].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
     const payload = {
-      orders,
+      orders: sortForGoogleSheets(orders),
       flowers,
       distributors,
       suppliers,
-      supplierOrders,
-      debtRecords,
-      transactions,
+      supplierOrders: sortForGoogleSheets(supplierOrders),
+      debtRecords: sortForGoogleSheets(debtRecords),
+      transactions: sortForGoogleSheets(transactions),
       inventory,
       employees,
       auditLogs,

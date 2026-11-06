@@ -21,7 +21,7 @@ import { MultiSelectFilter, type FilterOption } from '@/components/ui/MultiSelec
 import type { ColumnDef } from '@/stores/createListStore';
 import { useSupplierOrderStore } from '@/stores/hoaKhangThanhStore';
 import type { SupplierOrder, SupplierOrderItem } from '@/types/hoaKhangThanh';
-import { formatDate } from '@/lib/format';
+import { formatDate, parseDateTimestamp } from '@/lib/format';
 import { useColumnSettings } from '@/hooks/useColumnSettings';
 import { DonHangNCCFormModal } from './DonHangNCCFormModal';
 import { DonHangNCCDetailModal } from './DonHangNCCDetailModal';
@@ -146,6 +146,11 @@ export default function DonHangNCCPage() {
         (selectedDebtStatuses.includes('paid') && debt <= 0);
 
       return matchSearch && matchStatus && matchSupplier && matchDebt;
+    }).sort((a, b) => {
+      const tA = parseDateTimestamp(a.orderDate) ?? 0;
+      const tB = parseDateTimestamp(b.orderDate) ?? 0;
+      if (tB !== tA) return tB - tA; // Lớn tới bé
+      return (b.code || '').localeCompare(a.code || '', undefined, { numeric: true });
     });
   }, [orders, searchTerm, selectedStatuses, selectedSuppliers, selectedDebtStatuses]);
 
@@ -529,6 +534,7 @@ export default function DonHangNCCPage() {
           {/* DATA TABLE */}
           <div className="flex-1 min-h-0">
             <DataTable<SupplierOrder>
+              defaultSort={{ column: 'orderDate', direction: 'desc' }}
               data={filteredData}
               columns={columns}
               selectedIds={selectedIds}

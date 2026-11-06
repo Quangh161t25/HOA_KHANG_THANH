@@ -22,7 +22,7 @@ import { MultiSelectFilter, type FilterOption } from '@/components/ui/MultiSelec
 import type { ColumnDef } from '@/stores/createListStore';
 import { useDebtStore, useDistributorStore, useOrderStore } from '@/stores/hoaKhangThanhStore';
 import type { Order } from '@/types/hoaKhangThanh';
-import { formatDate } from '@/lib/format';
+import { formatDate, parseDateTimestamp } from '@/lib/format';
 import { checkCustomerOverdueDebt } from '@/lib/debtCheck';
 import { computeAllOrdersVirtualDebt, formatOldDebtDisplay } from '@/lib/orderDebtHelper';
 import { useColumnSettings } from '@/hooks/useColumnSettings';
@@ -204,6 +204,11 @@ export default function DonHangPage() {
         (selectedDebtStatuses.includes('paid') && debt <= 0);
 
       return matchSearch && matchStatus && matchPartner && matchDebt;
+    }).sort((a, b) => {
+      const tA = parseDateTimestamp(a.orderDate) ?? 0;
+      const tB = parseDateTimestamp(b.orderDate) ?? 0;
+      if (tB !== tA) return tB - tA; // Lớn tới bé: ngày mới nhất hiển thị lên đầu
+      return (b.code || '').localeCompare(a.code || '', undefined, { numeric: true });
     });
   }, [orders, searchTerm, selectedStatuses, selectedPartners, selectedDebtStatuses, overdueCustomerMap]);
 
@@ -654,6 +659,7 @@ export default function DonHangPage() {
           {/* DataTable */}
           <div className="flex-1 min-h-0">
             <DataTable<Order>
+              defaultSort={{ column: 'orderDate', direction: 'desc' }}
               data={filteredData}
               columns={columns}
               selectedIds={selectedIds}

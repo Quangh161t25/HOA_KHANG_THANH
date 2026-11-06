@@ -5,6 +5,7 @@ import { MAX_COLUMN_WIDTH, type ColumnDef, type SortDirection, type SortState } 
 import { Button } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { EmptyState, Spinner } from '@/components/ui/Feedback';
+import { parseDateTimestamp } from '@/lib/format';
 
 const PAGE_SIZES = [10, 20, 30, 50, 100];
 const PAGE_SIZE_ACCENTS = ['border-l-emerald-400', 'border-l-sky-400', 'border-l-violet-400', 'border-l-amber-400', 'border-l-rose-400', 'border-l-fuchsia-400'];
@@ -131,6 +132,7 @@ export interface DataTableProps<T> {
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   sort?: SortState;
+  defaultSort?: SortState;
   onSort?: (column: string | null, direction: SortDirection) => void;
   renderCell: (columnId: string, row: T) => ReactNode;
   renderMobileCard: (row: T, selected: boolean) => ReactNode;
@@ -213,6 +215,13 @@ function compareValues(a: any, b: any): number {
   if (a === undefined || a === null || a === '') return 1;
   if (b === undefined || b === null || b === '') return -1;
 
+  // Kiểm tra ngày trước (hỗ trợ YYYY-MM-DD, DD/MM/YYYY, ISO...)
+  const timeA = parseDateTimestamp(a);
+  const timeB = parseDateTimestamp(b);
+  if (timeA !== null && timeB !== null) {
+    return timeA - timeB;
+  }
+
   const numA = typeof a === 'number' ? a : (typeof a === 'string' && /^-?\d+(\.\d+)?$/.test(a.trim()) ? parseFloat(a) : NaN);
   const numB = typeof b === 'number' ? b : (typeof b === 'string' && /^-?\d+(\.\d+)?$/.test(b.trim()) ? parseFloat(b) : NaN);
 
@@ -222,15 +231,6 @@ function compareValues(a: any, b: any): number {
 
   const strA = String(a).trim();
   const strB = String(b).trim();
-
-  const datePattern = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-  const matchA = strA.match(datePattern);
-  const matchB = strB.match(datePattern);
-  if (matchA && matchB) {
-    const timeA = new Date(Number(matchA[3]), Number(matchA[2]) - 1, Number(matchA[1])).getTime();
-    const timeB = new Date(Number(matchB[3]), Number(matchB[2]) - 1, Number(matchB[1])).getTime();
-    return timeA - timeB;
-  }
 
   return strA.localeCompare(strB, 'vi', { numeric: true, sensitivity: 'base' });
 }
@@ -247,6 +247,7 @@ export function DataTable<T>({
   onPageChange,
   onPageSizeChange,
   sort,
+  defaultSort,
   onSort,
   renderCell,
   renderMobileCard,
@@ -297,7 +298,9 @@ export function DataTable<T>({
     return map;
   }, [dataCols]);
 
-  const [internalSort, setInternalSort] = useState<SortState>({ column: null, direction: null });
+  const [internalSort, setInternalSort] = useState<SortState>(
+    defaultSort || { column: null, direction: null },
+  );
   const activeSort = sort ?? internalSort;
 
   const sortedData = useMemo(() => {

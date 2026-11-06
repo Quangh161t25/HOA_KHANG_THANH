@@ -22,6 +22,29 @@ export function todayISODate() {
   return dayjs().format('YYYY-MM-DD');
 }
 
+/** Chuyển đổi an toàn bất kỳ định dạng ngày (YYYY-MM-DD, DD/MM/YYYY, ISO...) thành timestamp (ms) */
+export function parseDateTimestamp(val: unknown): number | null {
+  if (val === undefined || val === null || val === '') return null;
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val.getTime();
+  const s = String(val).trim();
+  if (!s) return null;
+
+  const isoMatch = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (isoMatch) {
+    const d = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+    return isNaN(d.getTime()) ? null : d.getTime();
+  }
+
+  const vnMatch = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (vnMatch) {
+    const d = new Date(Number(vnMatch[3]), Number(vnMatch[2]) - 1, Number(vnMatch[1]));
+    return isNaN(d.getTime()) ? null : d.getTime();
+  }
+
+  const parsed = Date.parse(s);
+  return isNaN(parsed) ? null : parsed;
+}
+
 export function formatCurrency(value: number) {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
 }
