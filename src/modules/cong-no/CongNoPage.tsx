@@ -45,14 +45,14 @@ const formatNumber = (num?: number) => {
 const NPP_COLUMNS: ColumnDef[] = [
   { id: 'date', label: 'Ngày ghi nhận', visible: true, minWidth: 105, width: 115, order: 0 },
   { id: 'entryType', label: 'Hình thức ghi', visible: true, minWidth: 115, width: 125, order: 1 },
-  { id: 'partnerCode', label: 'Mã NPP', visible: true, minWidth: 95, width: 105, order: 2 },
-  { id: 'partnerName', label: 'Tên Nhà Phân Phối', visible: true, minWidth: 190, width: 220, order: 3 },
-  { id: 'referenceCode', label: 'Chứng từ / ĐH', visible: true, minWidth: 110, width: 125, order: 4 },
-  { id: 'type', label: 'Thu / Chi', visible: true, minWidth: 95, width: 105, order: 5 },
-  { id: 'amount', label: 'Số tiền', visible: true, minWidth: 125, width: 135, order: 6 },
-  { id: 'remainingDebt', label: 'Công nợ còn', visible: true, minWidth: 125, width: 135, order: 7 },
-  { id: 'creator', label: 'Người lập', visible: true, minWidth: 110, width: 125, order: 8 },
-  { id: 'actions', label: 'Thao tác', visible: true, minWidth: 80, width: 85, order: 9 },
+  { id: 'partnerName', label: 'NPP / Khách hàng', visible: true, minWidth: 190, width: 230, order: 2 },
+  { id: 'referenceCode', label: 'Chứng từ / ĐH', visible: true, minWidth: 110, width: 125, order: 3 },
+  { id: 'type', label: 'Thu / Chi', visible: true, minWidth: 95, width: 105, order: 4 },
+  { id: 'amount', label: 'Số tiền', visible: true, minWidth: 125, width: 135, order: 5 },
+  { id: 'remainingDebt', label: 'Công nợ còn', visible: true, minWidth: 125, width: 135, order: 6 },
+  { id: 'creator', label: 'Người lập', visible: true, minWidth: 110, width: 125, order: 7 },
+  { id: 'actions', label: 'Thao tác', visible: true, minWidth: 80, width: 85, order: 8 },
+  { id: 'partnerCode', label: 'Mã NPP', visible: false, minWidth: 95, width: 105, order: 9 },
   { id: 'phone', label: 'Số điện thoại', visible: false, minWidth: 110, width: 120, order: 10 },
   { id: 'notes', label: 'Ghi chú', visible: false, minWidth: 180, width: 220, order: 11 },
 ];
@@ -60,14 +60,14 @@ const NPP_COLUMNS: ColumnDef[] = [
 const NCC_COLUMNS: ColumnDef[] = [
   { id: 'date', label: 'Ngày ghi nhận', visible: true, minWidth: 105, width: 115, order: 0 },
   { id: 'entryType', label: 'Hình thức ghi', visible: true, minWidth: 115, width: 125, order: 1 },
-  { id: 'partnerCode', label: 'Mã NCC', visible: true, minWidth: 95, width: 105, order: 2 },
-  { id: 'partnerName', label: 'Tên Nhà Cung Cấp', visible: true, minWidth: 190, width: 220, order: 3 },
-  { id: 'referenceCode', label: 'Lô nhập / CT', visible: true, minWidth: 110, width: 125, order: 4 },
-  { id: 'type', label: 'Thu / Chi', visible: true, minWidth: 95, width: 105, order: 5 },
-  { id: 'amount', label: 'Số tiền', visible: true, minWidth: 125, width: 135, order: 6 },
-  { id: 'remainingDebt', label: 'Công nợ còn', visible: true, minWidth: 125, width: 135, order: 7 },
-  { id: 'creator', label: 'Người lập', visible: true, minWidth: 110, width: 125, order: 8 },
-  { id: 'actions', label: 'Thao tác', visible: true, minWidth: 80, width: 85, order: 9 },
+  { id: 'partnerName', label: 'NCC / Nhà cung cấp', visible: true, minWidth: 190, width: 230, order: 2 },
+  { id: 'referenceCode', label: 'Lô nhập / CT', visible: true, minWidth: 110, width: 125, order: 3 },
+  { id: 'type', label: 'Thu / Chi', visible: true, minWidth: 95, width: 105, order: 4 },
+  { id: 'amount', label: 'Số tiền', visible: true, minWidth: 125, width: 135, order: 5 },
+  { id: 'remainingDebt', label: 'Công nợ còn', visible: true, minWidth: 125, width: 135, order: 6 },
+  { id: 'creator', label: 'Người lập', visible: true, minWidth: 110, width: 125, order: 7 },
+  { id: 'actions', label: 'Thao tác', visible: true, minWidth: 80, width: 85, order: 8 },
+  { id: 'partnerCode', label: 'Mã NCC', visible: false, minWidth: 95, width: 105, order: 9 },
   { id: 'phone', label: 'Số điện thoại', visible: false, minWidth: 110, width: 120, order: 10 },
   { id: 'notes', label: 'Ghi chú', visible: false, minWidth: 180, width: 220, order: 11 },
 ];
@@ -572,22 +572,41 @@ export default function CongNoPage() {
             📅 Ghi theo ngày
           </span>
         );
-      case 'partnerCode':
+      case 'partnerCode': {
+        const dist = row.partnerType === 'npp' ? distributors.find((d) => d.id === row.partnerId || d.name?.trim().toLowerCase() === row.partnerName?.trim().toLowerCase()) : null;
+        const sup = row.partnerType === 'ncc' ? suppliers.find((s) => s.id === row.partnerId || s.name?.trim().toLowerCase() === row.partnerName?.trim().toLowerCase()) : null;
+        const code = (row.partnerCode && row.partnerCode !== 'NPP-LE' && row.partnerCode !== 'NCC-LE')
+          ? row.partnerCode
+          : (dist?.code || sup?.code || '');
         return (
           <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-muted/60 border border-border">
-            {row.partnerCode}
+            {code || '—'}
           </span>
         );
-      case 'partnerName':
+      }
+      case 'partnerName': {
+        const dist = row.partnerType === 'npp' ? distributors.find((d) => d.id === row.partnerId || d.name?.trim().toLowerCase() === row.partnerName?.trim().toLowerCase()) : null;
+        const sup = row.partnerType === 'ncc' ? suppliers.find((s) => s.id === row.partnerId || s.name?.trim().toLowerCase() === row.partnerName?.trim().toLowerCase()) : null;
+        const code = (row.partnerCode && row.partnerCode !== 'NPP-LE' && row.partnerCode !== 'NCC-LE')
+          ? row.partnerCode
+          : (dist?.code || sup?.code || '');
         return (
-          <button
-            type="button"
-            onClick={() => handleView(row)}
-            className="text-xs font-bold text-primary hover:underline text-left"
-          >
-            {row.partnerName}
-          </button>
+          <div className="flex flex-col gap-0.5 items-start">
+            <button
+              type="button"
+              onClick={() => handleView(row)}
+              className="text-xs font-bold text-primary hover:underline text-left leading-snug"
+            >
+              {row.partnerName}
+            </button>
+            {code && (
+              <span className="text-[10px] font-mono text-muted-foreground bg-muted/80 px-1.5 py-0.5 rounded border border-border/60">
+                {code}
+              </span>
+            )}
+          </div>
         );
+      }
       case 'referenceCode':
         return row.referenceCode ? (
           <span className="inline-flex items-center gap-1 text-xs font-mono font-semibold px-2 py-0.5 rounded bg-muted/60 border border-border text-foreground">
@@ -695,6 +714,12 @@ export default function CongNoPage() {
         ? row.finalDebt
         : (row.oldDebt || 0) + (row.increaseAmount || 0) - (row.decreaseAmount || 0);
 
+    const dist = row.partnerType === 'npp' ? distributors.find((d) => d.id === row.partnerId || d.name?.trim().toLowerCase() === row.partnerName?.trim().toLowerCase()) : null;
+    const sup = row.partnerType === 'ncc' ? suppliers.find((s) => s.id === row.partnerId || s.name?.trim().toLowerCase() === row.partnerName?.trim().toLowerCase()) : null;
+    const code = (row.partnerCode && row.partnerCode !== 'NPP-LE' && row.partnerCode !== 'NCC-LE')
+      ? row.partnerCode
+      : (dist?.code || sup?.code || '');
+
     return (
       <div
         onClick={() => handleView(row)}
@@ -704,9 +729,11 @@ export default function CongNoPage() {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-muted/60 border border-border">
-              {row.partnerCode}
-            </span>
+            {code ? (
+              <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-muted/60 border border-border">
+                {code}
+              </span>
+            ) : null}
             <span className="text-xs font-mono font-bold text-foreground">
               {formatDate(row.date)}
             </span>

@@ -387,7 +387,7 @@ export function CongNoDrawer({
           {isView ? (
             <div className="p-3 bg-muted/40 rounded-lg border border-border text-xs">
               <span className="font-bold text-foreground">{record?.partnerName}</span>{' '}
-              <span className="text-muted-foreground">({record?.partnerCode})</span>
+              {record?.partnerCode && <span className="text-muted-foreground">({record.partnerCode})</span>}
               {record?.phone && <span className="ml-2 text-primary font-mono">{record.phone}</span>}
             </div>
           ) : (

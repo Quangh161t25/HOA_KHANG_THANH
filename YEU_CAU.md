@@ -2,8 +2,8 @@
 
 > **Dự án:** Quản lý Phân phối Hoa Khang Thành  
 > **Thời gian bắt đầu ghi nhận:** 22:13:17 - 25/10/2026 (Giờ Việt Nam GMT+7)  
-> **Cập nhật gần nhất:** 18:30:00 - 05/11/2026  
-> **Tổng số yêu cầu:** 50 yêu cầu  
+> **Cập nhật gần nhất:** 23:59:00 - 06/11/2026  
+> **Tổng số yêu cầu:** 51 yêu cầu  
 > **Trạng thái:** Toàn bộ đã hoàn thành và được kiểm thử thành công (100%)
 
 ---
@@ -62,6 +62,7 @@
 | **48** | 14:42:00 - 29/10/2026 | Căn lề phải Drawer Đọc ảnh ra đơn, mở rộng kích thước siêu thoáng (76rem / 90rem / Toàn màn hình) và tích hợp bộ công cụ phóng to thu nhỏ & kéo di chuyển ảnh (Zoom & Pan) | Đơn hàng NCC / OCR | Hoàn thành |
 | **49** | 13:42:46 - 05/11/2026 | Bổ sung tab thứ 3 "Lịch sử thao tác" trong module Đơn hàng: Tự động ghi lại nhật ký Thêm mới, Chỉnh sửa, Xóa, Đổi trạng thái của từng nhân viên kèm đối chiếu dữ liệu thay đổi (Diff) và snapshot | Đơn hàng / Nhật ký | Hoàn thành |
 | **50** | 14:52:20 - 05/11/2026 | Kết nối hệ thống Web với Google Sheets (`HOA_KHANG_THANH`) qua Google Service Account: Tự động thiết kế và tạo lập 11 sheets chuẩn kế toán cho từng module, tích hợp đồng bộ 2 chiều (Push/Pull) và Auto-sync | Toàn hệ thống / Google Sheets | Hoàn thành |
+| **51** | 23:45:00 - 06/11/2026 | Tối ưu hóa & thống nhất cột Đối tác module Công nợ khớp với Google Sheets: Gộp cột Mã & Tên thành 1 cột "NPP / Khách hàng" (đối tác), loại bỏ ô viền rỗng khi không có mã, tự động hiển thị mã đối tác dưới dạng badge thông minh, đồng bộ hai chiều chính xác | Công nợ / Đối tác | Hoàn thành |
 
 ---
 
@@ -1129,6 +1130,29 @@
      - TypeScript `tsc -b`: **Exit code 0** (0 lỗi).
      - Vite `npm run build`: **Biên dịch thành công 100%**.
      - API Google Sheets: Đã khởi tạo thành công 11 sheets và nạp ban đầu 426 ô dữ liệu lên Google Spreadsheet.
+
+---
+
+### Yêu cầu 51: Tối ưu hóa & thống nhất cột Đối tác module Công nợ khớp hoàn toàn với Google Sheets
+- **Thời gian:** `23:45:00 - 06/11/2026`
+- **Nguyên văn yêu cầu:**
+  > *"modul công nợ mã npp và tên là sao . sao ở gg sheet chỉ có 1 cột là đối tác thôi. xem lại"* kèm ảnh chụp màn hình đối chiếu Google Sheet (sheet `CONG_NO` cột B là Đối tác) và giao diện Web (có 2 cột "Mã NPP" và "Tên Nhà Phân Phối", trong đó cột "Mã NPP" bị ô viền rỗng không có mã).
+- **Phân tích nguyên nhân:**
+  1. Trước đây, giao diện Web phân chia thành 2 cột riêng biệt: `Mã NPP` (partnerCode) và `Tên Nhà Phân Phối` (partnerName). Khi người dùng tạo đơn hàng nhanh bằng tên khách hàng hoặc các đơn hàng phát sinh lẻ, thuộc tính `partnerCode` không được khởi tạo riêng, dẫn đến việc render `span` rỗng có viền xám tạo thành các ô trống vô nghĩa.
+  2. Trong khi đó, trên bảng Google Sheets (sheet `CONG_NO`) và module Đơn hàng, thiết kế kế toán chuẩn chỉ sử dụng duy nhất 1 cột: **`Đối tác`** (chứa tên đối tác như `HUY - HÀ NỘI`, `TRANG-SÀI GÒN`), tạo sự không đồng nhất giữa Web và Google Sheets.
+- **Giải pháp & Triển khai thực hiện:**
+  1. **Thống nhất bảng dữ liệu Công nợ Web ([`CongNoPage.tsx`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/src/modules/cong-no/CongNoPage.tsx)):**
+     - Đổi cột chính hiển thị thành 1 cột duy nhất: **"NPP / Khách hàng"** (cho tab NPP) và **"NCC / Nhà cung cấp"** (cho tab NCC), khớp hoàn toàn 1:1 với cột **"Đối tác"** trên Google Sheet `CONG_NO` và module Đơn hàng.
+     - Ẩn mặc định cột riêng biệt `Mã NPP` / `Mã NCC` (`visible: false`) trong định nghĩa cột (`NPP_COLUMNS` và `NCC_COLUMNS`). Người dùng vẫn có thể bật lại trong Cài đặt cột nếu muốn, và khi bật lại nếu không có mã thì hiển thị dấu gạch ngang `—` thay vì ô rỗng.
+     - Trong cột Đối tác: Tự động tra cứu mã đối tác tương ứng từ danh bạ NPP (`distributors`) hoặc NCC (`suppliers`). Nếu có mã chính thức (ví dụ: `NPP-001`, `NCC-002`), mã sẽ hiển thị như một huy hiệu nhỏ (`badge font-mono`) tinh gọn ngay bên dưới tên đối tác; nếu không có mã thì hiển thị tên đối tác sạch đẹp, liền mạch, không còn bất kỳ ô trống nào.
+  2. **Tối ưu hiển thị Mobile Card & Drawer chi tiết ([`CongNoDrawer.tsx`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/src/modules/cong-no/CongNoDrawer.tsx)):**
+     - Trong thẻ Mobile Card: Tự động tra cứu mã và chỉ hiển thị badge khi có mã hợp lệ; không hiển thị ô viền trống rỗng.
+     - Trong Drawer xem chi tiết công nợ: Loại bỏ cặp dấu ngoặc đơn rỗng `()` khi đối tác chưa có mã.
+  3. **Đồng bộ hóa 2 chiều chuẩn xác từ Google Sheets ([`googleSheetsService.ts`](file:///d:/t%E1%BA%A3i%20xu%E1%BB%91ng%202/hoa%20khang%20th%C3%A0nh/src/lib/googleSheetsService.ts)):**
+     - Khi thực hiện tải dữ liệu từ Google Sheets về Web (Pull), hệ thống tự động đối chiếu tên đối tác từ cột B với danh sách `distributors` và `suppliers` để phục hồi đầy đủ `partnerId` và `partnerCode` nếu có, đảm bảo dữ liệu trong Zustand store luôn nhất quán và toàn vẹn.
+  4. **Kiểm thử Kỹ thuật:**
+     - TypeScript `tsc -b`: **Exit code 0** (0 lỗi).
+     - Vite `npm run build`: **Biên dịch thành công 100%**.
 
 ---
 

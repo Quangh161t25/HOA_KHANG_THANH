@@ -404,21 +404,35 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
     // Columns: date, partnerName, partnerType(NPP/NCC), type, amount, remainingDebt, referenceCode, creator, notes
     const congNoRows = sheetMap['CONG_NO'] || [];
     if (congNoRows.length > 0) {
-      const records: DebtDailyRecord[] = congNoRows.filter((r) => r[0] && r[1]).map((r, idx) => ({
-        id: `cn-sync-${idx + 1}`,
-        date: String(r[0] || '').trim(),
-        partnerType: (r[2] === 'NPP' ? 'npp' : 'ncc') as DebtDailyRecord['partnerType'],
-        partnerId: `partner-sync-${idx + 1}`,
-        partnerCode: '',
-        partnerName: String(r[1] || '').trim(),
-        type: (r[3] === 'thu' || r[3] === 'Thu' ? 'thu' : 'chi') as DebtDailyRecord['type'],
-        amount: parseSheetNumber(r[4]) || 0,
-        remainingDebt: parseSheetNumber(r[5]) || 0,
-        finalDebt: parseSheetNumber(r[5]) || 0,
-        referenceCode: String(r[6] || '').trim(),
-        creator: String(r[7] || '').trim(),
-        notes: String(r[8] || '').trim(),
-      }));
+      const allDistributors = useDistributorStore.getState().distributors;
+      const allSuppliers = useSupplierStore.getState().suppliers;
+      const records: DebtDailyRecord[] = congNoRows.filter((r) => r[0] && r[1]).map((r, idx) => {
+        const partnerName = String(r[1] || '').trim();
+        const isNpp = r[2] === 'NPP';
+        const partnerType = (isNpp ? 'npp' : 'ncc') as DebtDailyRecord['partnerType'];
+        const matchedDist = isNpp
+          ? allDistributors.find((d) => d.name?.trim().toLowerCase() === partnerName.toLowerCase() || d.code === partnerName)
+          : null;
+        const matchedSup = !isNpp
+          ? allSuppliers.find((s) => s.name?.trim().toLowerCase() === partnerName.toLowerCase() || s.code === partnerName)
+          : null;
+
+        return {
+          id: `cn-sync-${idx + 1}`,
+          date: String(r[0] || '').trim(),
+          partnerType,
+          partnerId: matchedDist?.id || matchedSup?.id || `partner-sync-${idx + 1}`,
+          partnerCode: matchedDist?.code || matchedSup?.code || '',
+          partnerName,
+          type: (r[3] === 'thu' || r[3] === 'Thu' ? 'thu' : 'chi') as DebtDailyRecord['type'],
+          amount: parseSheetNumber(r[4]) || 0,
+          remainingDebt: parseSheetNumber(r[5]) || 0,
+          finalDebt: parseSheetNumber(r[5]) || 0,
+          referenceCode: String(r[6] || '').trim(),
+          creator: String(r[7] || '').trim(),
+          notes: String(r[8] || '').trim(),
+        };
+      });
       useDebtStore.setState({ records });
       counts['cong_no'] = records.length;
     }

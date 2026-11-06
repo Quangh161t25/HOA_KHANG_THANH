@@ -381,10 +381,11 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
           e.joinDate || '',
           e.salary || 0,
           e.status || 'Đang làm việc',
+          e.password || '123456',
         ]);
         batchData.push({
-          range: 'NHAN_VIEN!A2:K' + Math.max(2, rows.length + 1),
-          values: rows.length > 0 ? rows : [['', '', '', '', '', '', '', '', '', '', '']],
+          range: 'NHAN_VIEN!A2:L' + Math.max(2, rows.length + 1),
+          values: rows.length > 0 ? rows : [['', '', '', '', '', '', '', '', '', '', '', '']],
         });
       }
 
@@ -459,7 +460,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
         'NHA_PHAN_PHOI!A2:N',
         'NHA_CUNG_CAP!A2:K',
         'DON_HANG!A2:S',
-        'NHAN_VIEN!A2:K',
+        'NHAN_VIEN!A2:L',
         'THU_CHI!A2:I',
         'TON_KHO!A2:I',
         'CHI_TIET_DON_HANG!A2:L',
