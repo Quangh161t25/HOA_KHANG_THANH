@@ -234,8 +234,27 @@ export function initGoogleSheetsAutoSync() {
     }, 2000);
   };
 
-  // KHÔNG tự động push khi khởi động — chỉ push khi user thay đổi dữ liệu trong app.
-  // Nếu push ngay lúc load sẽ ghi đè dữ liệu người dùng nhập tay trực tiếp vào GG Sheets.
+  // Tự động PULL từ GG Sheets khi app khởi động (sau 1.5s để store hydrate xong từ localStorage).
+  // Giúp dữ liệu người dùng nhập tay vào GG Sheets được tải về app ngay khi load trang.
+  // Sau khi pull xong mới bắt đầu lắng nghe thay đổi để push (tránh push đè lên dữ liệu vừa pull).
+  setTimeout(async () => {
+    const { autoSync, pullFromSheets, checkStatus } = useGoogleSheetsStore.getState();
+    if (!autoSync) {
+      // Nếu auto-sync tắt, chỉ bắt subscriptions, không pull
+      _startSubscriptions(handleStoreChange);
+      return;
+    }
+    await checkStatus();
+    const { isConnected } = useGoogleSheetsStore.getState();
+    if (isConnected) {
+      await pullFromSheets();
+    }
+    // Bắt đầu lắng nghe thay đổi SAU khi pull xong
+    _startSubscriptions(handleStoreChange);
+  }, 1500);
+}
+
+function _startSubscriptions(handleStoreChange: () => void) {
   useOrderStore.subscribe(handleStoreChange);
   useFlowerStore.subscribe(handleStoreChange);
   useDistributorStore.subscribe(handleStoreChange);
