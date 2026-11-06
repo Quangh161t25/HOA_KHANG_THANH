@@ -1,3 +1,5 @@
+import { History } from 'lucide-react';
+import { ModuleHistory } from '@/components/data/ModuleHistory';
 import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -21,7 +23,7 @@ import type { InventoryItem } from '@/types/hoaKhangThanh';
 import { TonKhoDrawer } from './TonKhoDrawer';
 import { TonKhoStats } from './TonKhoStats';
 
-type Tab = 'danhsach' | 'thongke';
+type Tab = 'danhsach' | 'thongke' | 'lichsu';
 
 const INITIAL_COLUMNS: ColumnDef[] = [
   { id: 'flowerCode', label: 'Mã hoa', visible: true, minWidth: 100, width: 110, order: 0 },
@@ -252,13 +254,14 @@ export default function TonKhoPage() {
           tabs={[
             { id: 'danhsach', label: 'Danh sách', icon: List },
             { id: 'thongke', label: 'Thống kê', icon: ChartColumn },
+            { id: 'lichsu', label: 'Lịch sử thao tác', icon: History },
           ]}
           activeTab={activeTab}
           onChange={setActiveTab}
         />
       </div>
 
-      {activeTab === 'danhsach' ? (
+      {activeTab === 'lichsu' ? (<ModuleHistory module="ton-kho" />) : activeTab === 'danhsach' ? (
         <div className="flex-1 min-h-0 flex flex-col">
           <ListToolbar
             showBack={true}

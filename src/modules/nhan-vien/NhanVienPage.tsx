@@ -1,3 +1,5 @@
+import { History } from 'lucide-react';
+import { ModuleHistory } from '@/components/data/ModuleHistory';
 import { useMemo, useState } from 'react';
 import {
   Briefcase,
@@ -29,7 +31,7 @@ import { formatDate } from '@/lib/format';
 import { NhanVienDrawer } from './NhanVienDrawer';
 import { NhanVienStats } from './NhanVienStats';
 
-type Tab = 'danhsach' | 'thongke';
+type Tab = 'danhsach' | 'thongke' | 'lichsu';
 
 const INITIAL_COLUMNS: ColumnDef[] = [
   { id: 'code', label: 'Mã NV', visible: true, minWidth: 90, width: 100, order: 0 },
@@ -407,13 +409,14 @@ export default function NhanVienPage() {
           tabs={[
             { id: 'danhsach', label: 'Danh sách', icon: List },
             { id: 'thongke', label: 'Thống kê', icon: ChartColumn },
+            { id: 'lichsu', label: 'Lịch sử thao tác', icon: History },
           ]}
           activeTab={activeTab}
           onChange={setActiveTab}
         />
       </div>
 
-      {activeTab === 'danhsach' ? (
+      {activeTab === 'lichsu' ? (<ModuleHistory module="nhan-vien" />) : activeTab === 'danhsach' ? (
         <div className="flex-1 min-h-0 flex flex-col">
           <ListToolbar
             showBack={true}

@@ -161,7 +161,7 @@ interface OrderLogState {
 export const useOrderLogStore = create<OrderLogState>()(
   persist(
     (set) => ({
-      logs: INITIAL_ORDER_LOGS,
+      logs: [],
       addLog: (logInput) =>
         set((state) => {
           const newLog: OrderAuditLog = {
@@ -174,7 +174,7 @@ export const useOrderLogStore = create<OrderLogState>()(
       deleteLog: (id) =>
         set((state) => ({ logs: state.logs.filter((l) => l.id !== id) })),
       clearLogs: () => set({ logs: [] }),
-      resetLogs: () => set({ logs: INITIAL_ORDER_LOGS }),
+      resetLogs: () => set({ logs: [] }),
     }),
     { name: 'hkt-order-audit-logs-storage' },
   ),

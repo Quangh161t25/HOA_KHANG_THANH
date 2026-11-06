@@ -1,3 +1,5 @@
+import { History } from 'lucide-react';
+import { ModuleHistory } from '@/components/data/ModuleHistory';
 import { useMemo, useState } from 'react';
 import {
   ChartColumn,
@@ -20,7 +22,7 @@ import { validateFlowerAliases } from '@/lib/flowerValidation';
 import { HoaDrawer } from './HoaDrawer';
 import { HoaStats } from './HoaStats';
 
-type Tab = 'danhsach' | 'thongke';
+type Tab = 'danhsach' | 'thongke' | 'lichsu';
 
 const INITIAL_COLUMNS: ColumnDef[] = [
   { id: 'code', label: 'Mã hoa', visible: true, minWidth: 120, width: 140, order: 0 },
@@ -264,13 +266,14 @@ export default function HoaPage() {
           tabs={[
             { id: 'danhsach', label: 'Danh sách', icon: List },
             { id: 'thongke', label: 'Thống kê', icon: ChartColumn },
+            { id: 'lichsu', label: 'Lịch sử thao tác', icon: History },
           ]}
           activeTab={activeTab}
           onChange={setActiveTab}
         />
       </div>
 
-      {activeTab === 'danhsach' ? (
+      {activeTab === 'lichsu' ? (<ModuleHistory module="hoa" />) : activeTab === 'danhsach' ? (
         <div className="flex-1 min-h-0 flex flex-col">
           <ListToolbar
             showBack={true}

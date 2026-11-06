@@ -1,3 +1,5 @@
+import { History } from 'lucide-react';
+import { ModuleHistory } from '@/components/data/ModuleHistory';
 import { useMemo, useState } from 'react';
 import {
   Building2,
@@ -26,7 +28,7 @@ import { DonHangNCCDetailModal } from './DonHangNCCDetailModal';
 import { DonHangNCCStats } from './DonHangNCCStats';
 import { ImageOrderReaderModal } from './ImageOrderReaderModal';
 
-type Tab = 'danhsach' | 'thongke';
+type Tab = 'danhsach' | 'thongke' | 'lichsu';
 
 const INITIAL_COLUMNS: ColumnDef[] = [
   { id: 'code', label: 'ID đơn nhập', visible: true, minWidth: 110, width: 120, order: 0 },
@@ -432,13 +434,14 @@ export default function DonHangNCCPage() {
               label: 'Báo cáo & Thống kê hoa nhập',
               icon: ChartColumn,
             },
+            { id: 'lichsu', label: 'Lịch sử thao tác', icon: History },
           ]}
           activeTab={activeTab}
           onChange={(tab) => setActiveTab(tab as Tab)}
         />
       </div>
 
-      {activeTab === 'danhsach' ? (
+      {activeTab === 'lichsu' ? (<ModuleHistory module="don-hang-ncc" />) : activeTab === 'danhsach' ? (
         <div className="flex-1 flex flex-col min-h-0 p-4 space-y-3 overflow-hidden">
           {/* TOOLBAR */}
           <ListToolbar

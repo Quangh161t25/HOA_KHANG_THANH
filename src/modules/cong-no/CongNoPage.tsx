@@ -1,3 +1,5 @@
+import { History } from 'lucide-react';
+import { ModuleHistory } from '@/components/data/ModuleHistory';
 import { useMemo, useState } from 'react';
 import {
   ArrowDownLeft,
@@ -33,7 +35,7 @@ import { formatDate, todayISODate } from '@/lib/format';
 import { CongNoDrawer } from './CongNoDrawer';
 import { CongNoStats } from './CongNoStats';
 
-type Tab = 'npp' | 'ncc' | 'tonghop' | 'thongke';
+type Tab = 'npp' | 'ncc' | 'tonghop' | 'thongke' | 'lichsu';
 
 const formatNumber = (num?: number) => {
   if (num === undefined || num === null) return '0';
@@ -863,13 +865,14 @@ export default function CongNoPage() {
               label: 'Thống kê & Báo cáo',
               icon: BarChart3,
             },
+            { id: 'lichsu', label: 'Lịch sử thao tác', icon: History },
           ]}
           activeTab={activeTab}
           onChange={(tab) => handleTabChange(tab as Tab)}
         />
       </div>
 
-      {activeTab === 'thongke' ? (
+      {activeTab === 'lichsu' ? (<ModuleHistory module="cong-no" />) : activeTab === 'thongke' ? (
         <CongNoStats />
       ) : activeTab === 'tonghop' ? (
         /* Tab 3: Bảng Tổng hợp dòng công nợ phát sinh theo từng ngày */

@@ -1,3 +1,5 @@
+import { useModuleAuditStore } from './moduleAuditStore';
+import { useOrderLogStore } from './orderLogStore';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import {
@@ -8,6 +10,10 @@ import {
 } from '@/lib/googleSheetsService';
 import {
   useCashStore,
+  useDebtStore,
+  useInventoryStore,
+  useEmployeeStore,
+  useSupplierOrderStore,
   useDistributorStore,
   useFlowerStore,
   useOrderStore,
@@ -43,7 +49,7 @@ interface GoogleSheetsState {
 export const useGoogleSheetsStore = create<GoogleSheetsState>()(
   persist(
     (set, get) => ({
-      isConnected: true, // We already established and verified connection
+      isConnected: false, // Set only after a successful connection check or sync
       isChecking: false,
       isSyncing: false,
       lastSyncTime: null,
@@ -211,7 +217,12 @@ export function initGoogleSheetsAutoSync() {
 
   const handleStoreChange = () => {
     const { autoSync, syncToSheets, isSyncing } = useGoogleSheetsStore.getState();
-    if (!autoSync || isSyncing) return;
+    if (!autoSync) return;
+    if (isSyncing) {
+      if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+      syncDebounceTimer = setTimeout(handleStoreChange, 2000);
+      return;
+    }
 
     if (syncDebounceTimer) {
       clearTimeout(syncDebounceTimer);
@@ -219,7 +230,7 @@ export function initGoogleSheetsAutoSync() {
 
     // Debounce 2 giây để gom các thao tác liên tiếp
     syncDebounceTimer = setTimeout(() => {
-      syncToSheets(true);
+      if (useGoogleSheetsStore.getState().autoSync) syncToSheets(true);
     }, 2000);
   };
 
@@ -228,5 +239,11 @@ export function initGoogleSheetsAutoSync() {
   useDistributorStore.subscribe(handleStoreChange);
   useSupplierStore.subscribe(handleStoreChange);
   useCashStore.subscribe(handleStoreChange);
+  useDebtStore.subscribe(handleStoreChange);
+  useInventoryStore.subscribe(handleStoreChange);
+  useEmployeeStore.subscribe(handleStoreChange);
+  useSupplierOrderStore.subscribe(handleStoreChange);
+  useModuleAuditStore.subscribe(handleStoreChange);
+  useOrderLogStore.subscribe(handleStoreChange);
 }
 

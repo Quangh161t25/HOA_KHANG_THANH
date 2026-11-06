@@ -1,3 +1,5 @@
+import { History } from 'lucide-react';
+import { ModuleHistory } from '@/components/data/ModuleHistory';
 import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -33,7 +35,7 @@ import { formatDate } from '@/lib/format';
 import { NPPDrawer } from './NPPDrawer';
 import { NPPStats } from './NPPStats';
 
-type Tab = 'danhsach' | 'thongke';
+type Tab = 'danhsach' | 'thongke' | 'lichsu';
 
 const INITIAL_COLUMNS: ColumnDef[] = [
   { id: 'code', label: 'Mã NPP', visible: true, minWidth: 95, width: 105, order: 0 },
@@ -555,13 +557,14 @@ export default function NPPPage() {
           tabs={[
             { id: 'danhsach', label: 'Danh sách', icon: List },
             { id: 'thongke', label: 'Thống kê', icon: ChartColumn },
+            { id: 'lichsu', label: 'Lịch sử thao tác', icon: History },
           ]}
           activeTab={activeTab}
           onChange={setActiveTab}
         />
       </div>
 
-      {activeTab === 'danhsach' ? (
+      {activeTab === 'lichsu' ? (<ModuleHistory module="npp" />) : activeTab === 'danhsach' ? (
         <div className="flex-1 min-h-0 flex flex-col">
           <ListToolbar
             showBack={true}

@@ -1,3 +1,5 @@
+import { History } from 'lucide-react';
+import { ModuleHistory } from '@/components/data/ModuleHistory';
 import { useMemo, useState } from 'react';
 import {
   ArrowDownLeft,
@@ -27,7 +29,7 @@ import { ThuChiDrawer } from './ThuChiDrawer';
 import { ThuChiStats } from './ThuChiStats';
 import { FixedExpenseModal } from './FixedExpenseModal';
 
-type Tab = 'danhsach' | 'thongke';
+type Tab = 'danhsach' | 'thongke' | 'lichsu';
 
 const INITIAL_COLUMNS: ColumnDef[] = [
   { id: 'code', label: 'Mã Phiếu', visible: true, minWidth: 120, width: 130, order: 0 },
@@ -318,13 +320,14 @@ export default function ThuChiPage() {
           tabs={[
             { id: 'danhsach', label: 'Danh sách', icon: List },
             { id: 'thongke', label: 'Thống kê', icon: ChartColumn },
+            { id: 'lichsu', label: 'Lịch sử thao tác', icon: History },
           ]}
           activeTab={activeTab}
           onChange={setActiveTab}
         />
       </div>
 
-      {activeTab === 'danhsach' ? (
+      {activeTab === 'lichsu' ? (<ModuleHistory module="thu-chi" />) : activeTab === 'danhsach' ? (
         <div className="flex-1 min-h-0 flex flex-col">
           {/* Thanh Nút Chi Phí Cố Định (Bấm 1-click thêm ngay) */}
           <div className="mx-3 sm:mx-4 mt-2 mb-1 p-2.5 rounded-xl border border-amber-500/25 bg-amber-500/5 flex flex-wrap items-center justify-between gap-2.5">

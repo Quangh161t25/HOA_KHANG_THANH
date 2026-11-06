@@ -1,3 +1,4 @@
+import dayjs from 'dayjs';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -31,6 +32,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import {
   useCashStore,
+  useEmployeeStore,
   useDistributorStore,
   useFlowerStore,
   useInventoryStore,
@@ -44,6 +46,7 @@ const PIE_COLORS = ['#f43f5e', '#f59e0b', '#8b5cf6', '#10b981', '#06b6d4', '#ec4
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { orders } = useOrderStore();
+  const employees = useEmployeeStore((state) => state.employees);
   const { flowers } = useFlowerStore();
   const { distributors } = useDistributorStore();
   const { suppliers } = useSupplierStore();
@@ -79,16 +82,12 @@ export default function DashboardPage() {
     };
   }, [transactions]);
 
-  // Chart data: 7 days revenue mockup combined with real orders
-  const revenueChartData = [
-    { date: '19/10', revenue: 14200000, orders: 4 },
-    { date: '20/10', revenue: 28500000, orders: 9 }, // ngày phụ nữ Việt Nam
-    { date: '21/10', revenue: 18900000, orders: 5 },
-    { date: '22/10', revenue: 16500000, orders: 6 },
-    { date: '23/10', revenue: 21300000, orders: 7 },
-    { date: '24/10', revenue: 23580000, orders: 8 },
-    { date: '25/10', revenue: 29800000, orders: 9 },
-  ];
+  const revenueChartData = Array.from({ length: 7 }, (_, index) => {
+    const date = dayjs().subtract(6 - index, 'day');
+    const dailyOrders = orders.filter((order) =>
+      order.status !== 'cancelled' && order.status !== 'huy' && dayjs(order.orderDate).isSame(date, 'day'));
+    return { date: date.format('DD/MM'), revenue: dailyOrders.reduce((sum, order) => sum + order.totalAmount, 0), orders: dailyOrders.length };
+  });
 
   // Category distribution
   const categoryChartData = useMemo(() => {
@@ -180,7 +179,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center gap-1 mt-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
               <ArrowUpRight size={14} />
-              <span>+18.4% so với tháng trước</span>
+              <span>Tổng hợp từ đơn hàng hiện có</span>
             </div>
           </div>
         </div>
@@ -309,7 +308,7 @@ export default function DashboardPage() {
             <Users size={22} />
           </div>
           <div>
-            <div className="text-sm font-semibold text-foreground">7 Nhân viên công ty</div>
+            <div className="text-sm font-semibold text-foreground">{employees.length} Nhân viên công ty</div>
             <div className="text-xs text-muted-foreground">Cắm hoa, Kho lạnh & Kinh doanh</div>
           </div>
         </div>
@@ -325,7 +324,7 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground">Doanh số xuất bán sỉ hoa tươi theo ngày</p>
             </div>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-muted text-foreground">
-              Tuần 42 / 2026
+              {dayjs().subtract(6, 'day').format('DD/MM')} – {dayjs().format('DD/MM/YYYY')}
             </span>
           </div>
           <div className="h-64 w-full">

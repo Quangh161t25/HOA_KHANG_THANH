@@ -17,7 +17,7 @@ interface TabsProps<T extends string> {
 /** Nhóm tab dạng "segmented" dùng ở đầu mỗi trang. */
 export function Tabs<T extends string>({ tabs, activeTab, onChange, className }: TabsProps<T>) {
   return (
-    <div className={cn('flex gap-0.5 p-0.5 bg-muted/50 rounded-lg border border-border/50 w-fit', className)}>
+    <div className={cn('flex gap-0.5 p-0.5 bg-muted/50 rounded-lg border border-border/50 w-fit max-w-full overflow-x-auto', className)}>
       {tabs.map((tab) => {
         const active = tab.id === activeTab;
         const Icon = tab.icon;
@@ -26,7 +26,7 @@ export function Tabs<T extends string>({ tabs, activeTab, onChange, className }:
             key={tab.id}
             onClick={() => onChange(tab.id)}
             className={cn(
-              'flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all select-none',
+              'flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all select-none shrink-0 whitespace-nowrap',
               active ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground',
             )}
           >

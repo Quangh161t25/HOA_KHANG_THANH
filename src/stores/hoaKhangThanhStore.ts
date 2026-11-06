@@ -1,3 +1,4 @@
+import { watchModule } from './moduleAuditStore';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type {
@@ -12,18 +13,7 @@ import type {
   DebtDailyRecord,
   FixedExpensePreset,
 } from '@/types/hoaKhangThanh';
-import {
-  INITIAL_FLOWERS,
-  INITIAL_SUPPLIERS,
-  INITIAL_DISTRIBUTORS,
-  INITIAL_ORDERS,
-  INITIAL_SUPPLIER_ORDERS,
-  INITIAL_INVENTORY,
-  INITIAL_EMPLOYEES,
-  INITIAL_TRANSACTIONS,
-  INITIAL_DEBT_RECORDS,
-  DEFAULT_FIXED_EXPENSES,
-} from '@/data/mockHoaData';
+
 import { toInputDate, todayISODate } from '@/lib/format';
 import { recordOrderAudit } from './orderLogStore';
 
@@ -40,7 +30,7 @@ interface FlowerState {
 export const useFlowerStore = create<FlowerState>()(
   persist(
     (set) => ({
-      flowers: INITIAL_FLOWERS,
+      flowers: [],
       addFlower: (flower) =>
         set((state) => ({
           flowers: [{ ...flower, id: `fl-${Date.now()}` }, ...state.flowers],
@@ -65,7 +55,7 @@ export const useFlowerStore = create<FlowerState>()(
               : f,
           ),
         })),
-      resetFlowers: () => set({ flowers: INITIAL_FLOWERS }),
+      resetFlowers: () => set({ flowers: [] }),
     }),
     { name: 'hkt-flowers-storage' },
   ),
@@ -83,7 +73,7 @@ interface SupplierState {
 export const useSupplierStore = create<SupplierState>()(
   persist(
     (set) => ({
-      suppliers: INITIAL_SUPPLIERS,
+      suppliers: [],
       addSupplier: (s) =>
         set((state) => ({
           suppliers: [{ ...s, id: `ncc-${Date.now()}` }, ...state.suppliers],
@@ -96,7 +86,7 @@ export const useSupplierStore = create<SupplierState>()(
         set((state) => ({
           suppliers: state.suppliers.filter((s) => s.id !== id),
         })),
-      resetSuppliers: () => set({ suppliers: INITIAL_SUPPLIERS }),
+      resetSuppliers: () => set({ suppliers: [] }),
     }),
     { name: 'hkt-suppliers-storage' },
   ),
@@ -114,7 +104,7 @@ interface DistributorState {
 export const useDistributorStore = create<DistributorState>()(
   persist(
     (set) => ({
-      distributors: INITIAL_DISTRIBUTORS,
+      distributors: [],
       addDistributor: (d) =>
         set((state) => ({
           distributors: [{ ...d, id: `npp-${Date.now()}` }, ...state.distributors],
@@ -127,7 +117,7 @@ export const useDistributorStore = create<DistributorState>()(
         set((state) => ({
           distributors: state.distributors.filter((d) => d.id !== id),
         })),
-      resetDistributors: () => set({ distributors: INITIAL_DISTRIBUTORS }),
+      resetDistributors: () => set({ distributors: [] }),
     }),
     { name: 'hkt-distributors-storage' },
   ),
@@ -147,7 +137,7 @@ interface OrderState {
 export const useOrderStore = create<OrderState>()(
   persist(
     (set) => ({
-      orders: INITIAL_ORDERS,
+      orders: [],
       addOrder: (o, performer) =>
         set((state) => {
           const totalQty = o.items.reduce((s, i) => s + (i.quantity || 0), 0);
@@ -339,7 +329,7 @@ export const useOrderStore = create<OrderState>()(
           }
           return { orders: state.orders.filter((o) => o.id !== id) };
         }),
-      resetOrders: () => set({ orders: INITIAL_ORDERS }),
+      resetOrders: () => set({ orders: [] }),
     }),
     { name: 'hkt-orders-storage' },
   ),
@@ -357,7 +347,7 @@ interface InventoryState {
 export const useInventoryStore = create<InventoryState>()(
   persist(
     (set) => ({
-      inventory: INITIAL_INVENTORY,
+      inventory: [],
       importStock: (flowerId, quantity, warehouse, unitPrice, supplierName) =>
         set((state) => {
           const updated = state.inventory.map((item) => {
@@ -421,7 +411,7 @@ export const useInventoryStore = create<InventoryState>()(
         set((state) => ({
           inventory: state.inventory.map((i) => (i.flowerId === flowerId ? { ...i, ...updates } : i)),
         })),
-      resetInventory: () => set({ inventory: INITIAL_INVENTORY }),
+      resetInventory: () => set({ inventory: [] }),
     }),
     { name: 'hkt-inventory-storage' },
   ),
@@ -439,7 +429,7 @@ interface EmployeeState {
 export const useEmployeeStore = create<EmployeeState>()(
   persist(
     (set) => ({
-      employees: INITIAL_EMPLOYEES,
+      employees: [],
       addEmployee: (e) =>
         set((state) => ({
           employees: [{ ...e, id: `nv-${Date.now()}` }, ...state.employees],
@@ -452,7 +442,7 @@ export const useEmployeeStore = create<EmployeeState>()(
         set((state) => ({
           employees: state.employees.filter((e) => e.id !== id),
         })),
-      resetEmployees: () => set({ employees: INITIAL_EMPLOYEES }),
+      resetEmployees: () => set({ employees: [] }),
     }),
     { name: 'hkt-employees-storage' },
   ),
@@ -470,7 +460,7 @@ interface CashState {
 export const useCashStore = create<CashState>()(
   persist(
     (set) => ({
-      transactions: INITIAL_TRANSACTIONS,
+      transactions: [],
       addTransaction: (t) =>
         set((state) => ({
           transactions: [{ ...t, id: `tc-${Date.now()}` }, ...state.transactions],
@@ -483,7 +473,7 @@ export const useCashStore = create<CashState>()(
         set((state) => ({
           transactions: state.transactions.filter((t) => t.id !== id),
         })),
-      resetTransactions: () => set({ transactions: INITIAL_TRANSACTIONS }),
+      resetTransactions: () => set({ transactions: [] }),
     }),
     { name: 'hkt-cash-storage' },
   ),
@@ -501,7 +491,7 @@ interface DebtState {
 export const useDebtStore = create<DebtState>()(
   persist(
     (set) => ({
-      records: INITIAL_DEBT_RECORDS,
+      records: [],
       addRecord: (r) =>
         set((state) => {
           const isThu = r.type === 'thu';
@@ -589,7 +579,7 @@ export const useDebtStore = create<DebtState>()(
           }
           return { records: state.records.filter((r) => r.id !== id) };
         }),
-      resetRecords: () => set({ records: INITIAL_DEBT_RECORDS }),
+      resetRecords: () => set({ records: [] }),
     }),
     { name: 'hkt-debt-records-storage' },
   ),
@@ -607,7 +597,7 @@ interface FixedExpenseState {
 export const useFixedExpenseStore = create<FixedExpenseState>()(
   persist(
     (set) => ({
-      presets: DEFAULT_FIXED_EXPENSES,
+      presets: [],
       addPreset: (p) =>
         set((state) => ({
           presets: [...state.presets, { ...p, id: `fe-${Date.now()}` }],
@@ -620,7 +610,7 @@ export const useFixedExpenseStore = create<FixedExpenseState>()(
         set((state) => ({
           presets: state.presets.filter((p) => p.id !== id),
         })),
-      resetPresets: () => set({ presets: DEFAULT_FIXED_EXPENSES }),
+      resetPresets: () => set({ presets: [] }),
     }),
     { name: 'hkt-fixed-expenses-storage' },
   ),
@@ -640,7 +630,7 @@ interface SupplierOrderState {
 export const useSupplierOrderStore = create<SupplierOrderState>()(
   persist(
     (set) => ({
-      orders: INITIAL_SUPPLIER_ORDERS,
+      orders: [],
       addOrder: (order) =>
         set((state) => {
           const totalQty = order.items.reduce((sum, i) => sum + i.quantity, 0);
@@ -757,7 +747,7 @@ export const useSupplierOrderStore = create<SupplierOrderState>()(
 
           return { orders: updatedOrders };
         }),
-      resetOrders: () => set({ orders: INITIAL_SUPPLIER_ORDERS }),
+      resetOrders: () => set({ orders: [] }),
     }),
     { name: 'hkt-supplier-orders-storage' },
   ),
@@ -1251,3 +1241,14 @@ if (typeof window !== 'undefined') {
     syncAllOrdersToDebtRecords();
   }, 150);
 }
+
+// Register once, after persisted stores and startup migrations are initialized.
+watchModule(useFlowerStore, (state) => state.flowers, 'hoa', (row) => row.id);
+watchModule(useSupplierStore, (state) => state.suppliers, 'ncc', (row) => row.id);
+watchModule(useDistributorStore, (state) => state.distributors, 'npp', (row) => row.id);
+watchModule(useSupplierOrderStore, (state) => state.orders, 'don-hang-ncc', (row) => row.id);
+watchModule(useInventoryStore, (state) => state.inventory, 'ton-kho', (row) => row.flowerId);
+watchModule(useEmployeeStore, (state) => state.employees, 'nhan-vien', (row) => row.id);
+watchModule(useCashStore, (state) => state.transactions, 'thu-chi', (row) => row.id);
+watchModule(useFixedExpenseStore, (state) => state.presets, 'thu-chi', (row) => row.id);
+watchModule(useDebtStore, (state) => state.records, 'cong-no', (row) => row.id);
