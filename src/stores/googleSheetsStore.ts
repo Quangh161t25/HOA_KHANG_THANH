@@ -234,15 +234,8 @@ export function initGoogleSheetsAutoSync() {
     }, 2000);
   };
 
-  const hasLocalData = [
-    useOrderStore.getState().orders, useFlowerStore.getState().flowers,
-    useDistributorStore.getState().distributors, useSupplierStore.getState().suppliers,
-    useCashStore.getState().transactions, useDebtStore.getState().records,
-    useInventoryStore.getState().inventory, useEmployeeStore.getState().employees,
-    useSupplierOrderStore.getState().orders,
-  ].some((rows) => rows.length > 0);
-  if (hasLocalData) handleStoreChange();
-
+  // KHÔNG tự động push khi khởi động — chỉ push khi user thay đổi dữ liệu trong app.
+  // Nếu push ngay lúc load sẽ ghi đè dữ liệu người dùng nhập tay trực tiếp vào GG Sheets.
   useOrderStore.subscribe(handleStoreChange);
   useFlowerStore.subscribe(handleStoreChange);
   useDistributorStore.subscribe(handleStoreChange);
