@@ -29,6 +29,7 @@ import type { Flower, Order, OrderItem } from '@/types/hoaKhangThanh';
 import { checkCustomerOverdueDebt } from '@/lib/debtCheck';
 import { getDistributorDebtAsOfDate } from '@/lib/orderDebtHelper';
 import { formatDate } from '@/lib/format';
+import { PartnerAutocomplete, type PartnerOption } from '@/components/ui/PartnerAutocomplete';
 
 dayjs.extend(customParseFormat);
 
@@ -648,48 +649,63 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
     );
   }, [isCustomPartner, distributorId, partnerName, orderDate, isOpen, orderToEdit?.id]);
 
-  const handleDistributorChange = (val: string) => {
-    if (val === '__custom__') {
+  // Danh sách NPP cho Autocomplete tìm kiếm
+  const distributorOptions: PartnerOption[] = useMemo(() => {
+    return distributors.map((d) => ({
+      id: d.id,
+      name: d.name,
+      code: d.code,
+      phone: d.representative || d.phone,
+      address: d.address,
+      currentDebt: d.currentDebt,
+    }));
+  }, [distributors]);
+
+  const handlePartnerSelect = (p: {
+    id?: string;
+    name: string;
+    code?: string;
+    phone?: string;
+    address?: string;
+    isCustom?: boolean;
+  }) => {
+    if (p.id) {
+      setIsCustomPartner(false);
+      setDistributorId(p.id);
+      setPartnerName(p.name);
+      if (p.phone) setPhone(p.phone);
+
+      // Lấy công nợ của đối tác này tính tới ngày orderDate
+      const debt = getDistributorDebtAsOfDate(
+        p.id,
+        p.name,
+        orderDate,
+        useOrderStore.getState().orders,
+        useDebtStore.getState().records,
+        distributors,
+      );
+      setOldDebt(debt);
+
+      // Kiểm tra ngay công nợ quá hạn 4 ngày và thông báo
+      const check = checkCustomerOverdueDebt(
+        p.id,
+        p.name,
+        useOrderStore.getState().orders,
+        orderToEdit?.id,
+        orderDate,
+        useDebtStore.getState().records,
+      );
+      if (check.hasOverdueUnpaidDebt && check.earliestUnpaidOrder) {
+        toast.warning(
+          `⚠️ Chưa trả nợ: Khách ${p.name} có đơn ${check.earliestUnpaidOrder.code} quá 4 ngày chưa thanh toán đủ (còn thiếu ${check.earliestUnpaidOrder.remainingDebt.toLocaleString('vi-VN')})!`,
+          { duration: 6000 },
+        );
+      }
+    } else {
       setIsCustomPartner(true);
       setDistributorId('');
-      setPartnerName('');
-      setPhone('');
+      setPartnerName(p.name);
       setOldDebt(0);
-    } else {
-      setIsCustomPartner(false);
-      setDistributorId(val);
-      const dist = distributors.find((d) => d.id === val);
-      if (dist) {
-        setPartnerName(dist.name);
-        setPhone(dist.phone);
-
-        // Lấy công nợ của đối tác này tính tới ngày orderDate
-        const debt = getDistributorDebtAsOfDate(
-          dist.id,
-          dist.name,
-          orderDate,
-          useOrderStore.getState().orders,
-          useDebtStore.getState().records,
-          distributors,
-        );
-        setOldDebt(debt);
-
-        // Kiểm tra ngay công nợ quá hạn 4 ngày và thông báo
-        const check = checkCustomerOverdueDebt(
-          dist.id,
-          dist.name,
-          useOrderStore.getState().orders,
-          orderToEdit?.id,
-          orderDate,
-          useDebtStore.getState().records,
-        );
-        if (check.hasOverdueUnpaidDebt && check.earliestUnpaidOrder) {
-          toast.warning(
-            `⚠️ Chưa trả nợ: Khách ${dist.name} có đơn ${check.earliestUnpaidOrder.code} quá 4 ngày chưa thanh toán đủ (còn thiếu ${check.earliestUnpaidOrder.remainingDebt.toLocaleString('vi-VN')})!`,
-            { duration: 6000 },
-          );
-        }
-      }
     }
   };
 
@@ -1026,51 +1042,15 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2.5 border-t border-border/50">
               <div className="sm:col-span-2">
                 <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                  NPP / Khách hàng
+                  NPP / Khách hàng (Gõ để tìm kiếm)
                 </label>
-                {!isCustomPartner ? (
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={distributorId}
-                      onChange={(e) => handleDistributorChange(e.target.value)}
-                      className="flex-1 h-8 px-2.5 rounded-lg border border-border bg-background text-xs font-semibold text-foreground focus:ring-1 focus:ring-primary"
-                    >
-                      {distributors.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name} ({d.code} • {d.representative || d.phone})
-                        </option>
-                      ))}
-                      <option value="__custom__">+ Khách hàng khác (Tự nhập tên)...</option>
-                    </select>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="text"
-                      value={partnerName}
-                      onChange={(e) => setPartnerName(e.target.value)}
-                      placeholder="Nhập tên khách hàng mới..."
-                      className="flex-1 h-8 px-2.5 rounded-lg border border-primary/50 bg-background text-xs font-semibold text-foreground focus:ring-1 focus:ring-primary"
-                      autoFocus
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setIsCustomPartner(false);
-                        if (distributors[0]) {
-                          setDistributorId(distributors[0].id);
-                          setPartnerName(distributors[0].name);
-                          setPhone(distributors[0].phone);
-                        }
-                      }}
-                      className="h-8 text-[11px] px-2 text-muted-foreground shrink-0"
-                    >
-                      Chọn NPP có sẵn
-                    </Button>
-                  </div>
-                )}
+                <PartnerAutocomplete
+                  value={partnerName}
+                  selectedId={distributorId}
+                  options={distributorOptions}
+                  onChange={handlePartnerSelect}
+                  placeholder="Gõ tên hoặc mã NPP / Khách hàng..."
+                />
               </div>
 
               <div>

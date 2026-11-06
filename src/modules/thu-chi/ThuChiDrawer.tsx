@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, Edit, Wallet, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import { Drawer } from '@/components/ui/Drawer';
-import { useCashStore, useFixedExpenseStore } from '@/stores/hoaKhangThanhStore';
+import { useCashStore, useDistributorStore, useFixedExpenseStore, useSupplierStore } from '@/stores/hoaKhangThanhStore';
 import type { CashTransaction } from '@/types/hoaKhangThanh';
 import { formatDate } from '@/lib/format';
+import { PartnerAutocomplete } from '@/components/ui/PartnerAutocomplete';
 
 interface Props {
   isOpen: boolean;
@@ -55,6 +56,28 @@ export function ThuChiDrawer({ isOpen, onClose, transaction, mode: initialMode =
   const [partner, setPartner] = useState('');
   const [creator, setCreator] = useState('Trần Thị Kim Thành');
   const [notes, setNotes] = useState('');
+
+  const { distributors } = useDistributorStore();
+  const { suppliers } = useSupplierStore();
+
+  const partnerOptions = useMemo(() => {
+    if (type === 'income') {
+      return distributors.map((d) => ({
+        id: d.id,
+        name: d.name,
+        code: d.code,
+        phone: d.phone,
+        currentDebt: d.currentDebt,
+      }));
+    }
+    return suppliers.map((s) => ({
+      id: s.id,
+      name: s.name,
+      code: s.code,
+      phone: s.phone,
+      currentDebt: s.finalDebt ?? s.totalDebt,
+    }));
+  }, [type, distributors, suppliers]);
 
   const isView = mode === 'view';
 
@@ -367,14 +390,14 @@ export function ThuChiDrawer({ isOpen, onClose, transaction, mode: initialMode =
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
-              Đối tượng {type === 'income' ? 'nộp tiền (Đại lý / Khách)' : 'nhận tiền (NCC / Nhân viên)'}
+              Đối tượng {type === 'income' ? 'nộp tiền (Đại lý / Khách)' : 'nhận tiền (NCC / Nhân viên)'} (Gõ để tìm kiếm)
             </label>
-            <input
-              type="text"
+            <PartnerAutocomplete
               value={partner}
-              onChange={(e) => setPartner(e.target.value)}
-              placeholder="VD: Chuỗi Shop Hoa FlowerBox hoặc Trang trại Hasfarm..."
-              className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none"
+              options={partnerOptions}
+              onChange={(p) => setPartner(p.name)}
+              placeholder={type === 'income' ? 'Gõ tên NPP / Khách hàng...' : 'Gõ tên Nhà vườn / NCC...'}
+              inputClassName="h-9 px-3"
             />
           </div>
 

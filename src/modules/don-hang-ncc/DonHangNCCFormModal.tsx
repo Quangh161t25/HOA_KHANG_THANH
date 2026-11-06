@@ -23,6 +23,7 @@ import {
 } from '@/stores/hoaKhangThanhStore';
 import type { Flower, SupplierOrder, SupplierOrderItem } from '@/types/hoaKhangThanh';
 import { ImageOrderReaderModal } from './ImageOrderReaderModal';
+import { PartnerAutocomplete, type PartnerOption } from '@/components/ui/PartnerAutocomplete';
 
 dayjs.extend(customParseFormat);
 
@@ -369,10 +370,6 @@ export function DonHangNCCFormModal({ isOpen, onClose, orderToEdit, initialItems
   // Items State
   const [items, setItems] = useState<SupplierOrderItem[]>([]);
 
-  // Supplier Search dropdown
-  const [supplierSearch, setSupplierSearch] = useState('');
-  const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
-
   // Initialize or Reset
   useEffect(() => {
     if (!isOpen) return;
@@ -394,7 +391,6 @@ export function DonHangNCCFormModal({ isOpen, onClose, orderToEdit, initialItems
       setNotes(orderToEdit.notes || '');
       setImageUrl(orderToEdit.imageUrl);
       setItems(orderToEdit.items || []);
-      setSupplierSearch(orderToEdit.supplierName);
     } else {
       // Create new order code
       const nextNum = (orders.length + 1).toString().padStart(3, '0');
@@ -406,13 +402,11 @@ export function DonHangNCCFormModal({ isOpen, onClose, orderToEdit, initialItems
         setSupplierName(firstSup.name);
         setPhone(firstSup.phone || '');
         setAddress(firstSup.address || '');
-        setSupplierSearch(firstSup.name);
       } else {
         setSupplierId('');
         setSupplierName('');
         setPhone('');
         setAddress('');
-        setSupplierSearch('');
       }
 
       setOrderDate(dayjs().format('YYYY-MM-DD'));
@@ -447,26 +441,30 @@ export function DonHangNCCFormModal({ isOpen, onClose, orderToEdit, initialItems
     }
   }, [isOpen, orderToEdit, orders.length, suppliers, initialItems]);
 
-  // Handle supplier selection
-  const handleSelectSupplier = (s: { id: string; name: string; phone?: string; address?: string }) => {
-    setSupplierId(s.id);
-    setSupplierName(s.name);
-    setPhone(s.phone || '');
-    setAddress(s.address || '');
-    setSupplierSearch(s.name);
-    setIsSupplierDropdownOpen(false);
-  };
+  const supplierOptions: PartnerOption[] = useMemo(() => {
+    return suppliers.map((s) => ({
+      id: s.id,
+      name: s.name,
+      code: s.code,
+      phone: s.phone,
+      address: s.address,
+      currentDebt: s.finalDebt ?? s.totalDebt,
+    }));
+  }, [suppliers]);
 
-  const filteredSuppliers = useMemo(() => {
-    const q = supplierSearch.toLowerCase().trim();
-    if (!q) return suppliers;
-    return suppliers.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.code.toLowerCase().includes(q) ||
-        (s.phone && s.phone.includes(q))
-    );
-  }, [suppliers, supplierSearch]);
+  // Handle supplier selection
+  const handleSelectSupplier = (s: {
+    id?: string;
+    name: string;
+    phone?: string;
+    address?: string;
+    isCustom?: boolean;
+  }) => {
+    setSupplierId(s.id || '');
+    setSupplierName(s.name);
+    if (s.phone) setPhone(s.phone);
+    if (s.address) setAddress(s.address);
+  };
 
   // Items manipulation
   const handleAddItemRow = () => {
@@ -695,57 +693,17 @@ export function DonHangNCCFormModal({ isOpen, onClose, orderToEdit, initialItems
             </div>
 
             {/* Nhà cung cấp */}
-            <div className="relative">
+            <div>
               <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                Nhà cung cấp / Vườn hoa
+                Nhà cung cấp / Vườn hoa (Gõ để tìm kiếm)
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={supplierSearch}
-                  onChange={(e) => {
-                    setSupplierSearch(e.target.value);
-                    setSupplierName(e.target.value);
-                    setIsSupplierDropdownOpen(true);
-                  }}
-                  onFocus={() => setIsSupplierDropdownOpen(true)}
-                  placeholder="Chọn hoặc gõ tên nhà vườn..."
-                  className="w-full h-8 pl-2.5 pr-7 rounded-lg border border-border bg-background text-xs text-foreground focus:ring-1 focus:ring-primary"
-                />
-                <button
-                  type="button"
-                  onClick={() => setIsSupplierDropdownOpen((v) => !v)}
-                  className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
-                >
-                  <ChevronDown size={14} />
-                </button>
-              </div>
-
-              {isSupplierDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto py-1">
-                  {filteredSuppliers.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => handleSelectSupplier(s)}
-                      className="w-full text-left px-2.5 py-1.5 hover:bg-muted text-xs flex items-center justify-between"
-                    >
-                      <div>
-                        <div className="font-semibold text-foreground">{s.name}</div>
-                        <div className="text-[10px] text-muted-foreground">
-                          {s.phone} {s.address ? `• ${s.address}` : ''}
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-mono text-muted-foreground">{s.code}</span>
-                    </button>
-                  ))}
-                  {filteredSuppliers.length === 0 && (
-                    <div className="px-2.5 py-2 text-muted-foreground text-center text-xs">
-                      Không tìm thấy NCC. Dùng tên "{supplierSearch}" làm nhà vườn mới.
-                    </div>
-                  )}
-                </div>
-              )}
+              <PartnerAutocomplete
+                value={supplierName}
+                selectedId={supplierId}
+                options={supplierOptions}
+                onChange={handleSelectSupplier}
+                placeholder="Chọn hoặc gõ tên nhà vườn..."
+              />
             </div>
 
             {/* Số điện thoại */}

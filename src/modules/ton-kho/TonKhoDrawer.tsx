@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, Boxes } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
@@ -9,6 +9,7 @@ import {
   useSupplierStore,
 } from '@/stores/hoaKhangThanhStore';
 import type { InventoryItem } from '@/types/hoaKhangThanh';
+import { PartnerAutocomplete } from '@/components/ui/PartnerAutocomplete';
 
 interface Props {
   isOpen: boolean;
@@ -37,6 +38,17 @@ export function TonKhoDrawer({ isOpen, onClose, inventoryItem, defaultType = 'im
   const [unitPrice, setUnitPrice] = useState(inventoryItem?.costPrice || 5000);
   const [reason, setReason] = useState<'order' | 'damage' | 'adjust'>('damage');
   const [notes, setNotes] = useState('');
+
+  const supplierOptions = useMemo(() => {
+    return suppliers.map((s) => ({
+      id: s.id,
+      name: s.name,
+      code: s.code,
+      phone: s.phone,
+      address: s.address,
+    }));
+  }, [suppliers]);
+  const currentSupplier = suppliers.find((s) => s.id === supplierId);
 
   if (!isOpen) return null;
 
@@ -235,18 +247,20 @@ export function TonKhoDrawer({ isOpen, onClose, inventoryItem, defaultType = 'im
           {mode === 'import' ? (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Nhà cung cấp / Vườn</label>
-                <select
-                  value={supplierId}
-                  onChange={(e) => setSupplierId(e.target.value)}
-                  className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground"
-                >
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Nhà cung cấp / Vườn (Gõ để tìm kiếm)
+                </label>
+                <PartnerAutocomplete
+                  value={currentSupplier?.name || ''}
+                  selectedId={supplierId}
+                  options={supplierOptions}
+                  onChange={(s) => {
+                    if (s.id) setSupplierId(s.id);
+                  }}
+                  allowCustom={false}
+                  placeholder="Chọn hoặc gõ tên nhà vườn..."
+                  inputClassName="h-9 px-3"
+                />
               </div>
 
               <div>

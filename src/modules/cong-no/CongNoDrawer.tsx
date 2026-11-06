@@ -26,6 +26,7 @@ import {
 } from '@/stores/hoaKhangThanhStore';
 import type { DebtDailyRecord } from '@/types/hoaKhangThanh';
 import { formatDate } from '@/lib/format';
+import { PartnerAutocomplete } from '@/components/ui/PartnerAutocomplete';
 
 interface Props {
   isOpen: boolean;
@@ -390,18 +391,19 @@ export function CongNoDrawer({
               {record?.phone && <span className="ml-2 text-primary font-mono">{record.phone}</span>}
             </div>
           ) : (
-            <select
-              value={partnerId}
-              onChange={(e) => handlePartnerChange(e.target.value)}
-              className="w-full text-xs rounded-lg border border-input bg-card px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="" disabled>-- Chọn đối tác --</option>
-              {partnerList.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.code} - {p.name} {p.phone ? `(${p.phone})` : ''} - Nợ hiện tại: {formatNumber(p.currentDebt)}
-                </option>
-              ))}
-            </select>
+            <PartnerAutocomplete
+              value={selectedPartner?.name || ''}
+              selectedId={partnerId}
+              options={partnerList}
+              onChange={(p) => {
+                if (p.id) {
+                  handlePartnerChange(p.id);
+                }
+              }}
+              allowCustom={false}
+              placeholder={partnerType === 'npp' ? 'Gõ tìm kiếm Nhà Phân Phối...' : 'Gõ tìm kiếm Nhà Cung Cấp...'}
+              inputClassName="h-9 px-3"
+            />
           )}
         </div>
 
