@@ -215,18 +215,24 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
         const name = String(r[1] || '').trim();
         const prev = existingFlowerMap.get(code) || existingFlowerNameMap.get(name);
 
+        const cleanOrigin = (prev?.origin === 'Đà Lạt' || !prev?.origin) ? '' : prev.origin;
+        const cleanColor = (prev?.color === 'Đa sắc' || !prev?.color) ? '' : prev.color;
+        const cleanStock = (prev?.stock === 100 || prev?.stock === 200 || !prev?.stock) ? 0 : prev.stock;
+        const cleanCategory = r[4] ? String(r[4]).trim() : (prev?.category === 'Khác' ? '' : (prev?.category || ''));
+        const cleanUnit = r[3] ? String(r[3]).trim() : (prev?.unit || '');
+
         return {
           id: prev?.id || `hoa-sync-${idx + 1}`,
           code,
           name,
           customName: r[2] ? String(r[2]).trim() : (prev?.customName || ''),
-          unit: r[3] ? String(r[3]).trim() : (prev?.unit || ''),
-          category: r[4] ? String(r[4]).trim() : (prev?.category || ''),
+          unit: cleanUnit,
+          category: cleanCategory,
           costPrice: prev?.costPrice || 0,
           wholesalePrice: prev?.wholesalePrice || 0,
-          stock: prev?.stock || 0,
-          origin: prev?.origin || '',
-          color: prev?.color || '',
+          stock: cleanStock,
+          origin: cleanOrigin,
+          color: cleanColor,
           status: (r[5] === 'Tạm hết' ? 'out_of_stock' : (r[5] ? 'active' : (prev?.status || 'active'))) as Flower['status'],
           description: String(r[6] || prev?.description || '').trim(),
         };

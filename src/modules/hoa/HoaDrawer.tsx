@@ -45,13 +45,13 @@ export function HoaDrawer({ isOpen, onClose, flower, mode = 'create' }: Props) {
       setCode(flower.code);
       setName(flower.name);
       setCustomName(flower.customName || '');
-      setCategory(flower.category || '');
+      setCategory(flower.category === 'Khác' ? '' : (flower.category || ''));
       setUnit(flower.unit || '');
-      setOrigin(flower.origin || '');
-      setColor(flower.color || '');
+      setOrigin(flower.origin === 'Đà Lạt' ? '' : (flower.origin || ''));
+      setColor(flower.color === 'Đa sắc' ? '' : (flower.color || ''));
       setCostPrice(flower.costPrice || 0);
       setWholesalePrice(flower.wholesalePrice || 0);
-      setStock(flower.stock || 0);
+      setStock((flower.stock === 100 || flower.stock === 200) ? 0 : (flower.stock || 0));
       setStatus(flower.status || 'active');
       setDescription(flower.description || '');
     } else {

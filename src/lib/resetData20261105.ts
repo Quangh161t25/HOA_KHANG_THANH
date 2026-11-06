@@ -35,3 +35,28 @@ if (typeof window !== 'undefined' && localStorage.getItem(syncRepairKey) !== 'do
   localStorage.setItem(key, JSON.stringify(saved));
   localStorage.setItem(syncRepairKey, 'done');
 }
+
+
+// Xóa sạch các giá trị ảo cũ ('Đa sắc', 'Đà Lạt', tồn kho 100, 200) khỏi danh sách hoa
+const flowerMockCleanKey = 'hkt-clean-flower-mocks-2026-11-06-v3';
+if (typeof window !== 'undefined' && localStorage.getItem(flowerMockCleanKey) !== 'done') {
+  try {
+    const raw = localStorage.getItem('hkt-flowers-storage');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed?.state?.flowers)) {
+        parsed.state.flowers = parsed.state.flowers.map((f) => ({
+          ...f,
+          color: (f.color === 'Đa sắc' ? '' : (f.color || '')),
+          origin: (f.origin === 'Đà Lạt' ? '' : (f.origin || '')),
+          stock: ((f.stock === 100 || f.stock === 200) ? 0 : (f.stock || 0)),
+          category: (f.category === 'Khác' ? '' : (f.category || '')),
+        }));
+        localStorage.setItem('hkt-flowers-storage', JSON.stringify(parsed));
+      }
+    }
+  } catch (err) {
+    console.error('Error cleaning flower mocks:', err);
+  }
+  localStorage.setItem(flowerMockCleanKey, 'done');
+}
