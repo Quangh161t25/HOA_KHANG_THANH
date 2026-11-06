@@ -837,7 +837,6 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const validItems = items.filter((i) => i.flowerId && i.flowerName);
-    const hasZeroQty = validItems.some((i) => (i.quantity || 0) <= 0);
     // Nhắc nhở nếu khách chưa trả nợ đơn hàng quá 4 ngày
     if (debtCheck.hasOverdueUnpaidDebt && debtCheck.earliestUnpaidOrder) {
       const confirmMsg = `⚠️ CẢNH BÁO CÔNG NỢ:\nKhách hàng "${partnerName}" chưa trả nợ đơn hàng quá 4 ngày (${debtCheck.earliestUnpaidOrder.code} còn thiếu ${formatNumber(debtCheck.earliestUnpaidOrder.remainingDebt)}).\n\nBạn có chắc chắn muốn tiếp tục lên đơn hàng mới này không?`;

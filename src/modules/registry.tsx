@@ -11,4 +11,5 @@ export const MODULE_PAGES: Record<string, LazyExoticComponent<ComponentType>> = 
   congNo: lazy(() => import('./cong-no/CongNoPage')),
   thuChi: lazy(() => import('./thu-chi/ThuChiPage')),
   nhanVien: lazy(() => import('./nhan-vien/NhanVienPage')),
+  phanQuyen: lazy(() => import('./phan-quyen/PhanQuyenPage')),
 };

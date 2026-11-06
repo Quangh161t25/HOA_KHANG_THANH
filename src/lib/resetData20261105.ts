@@ -45,7 +45,7 @@ if (typeof window !== 'undefined' && localStorage.getItem(flowerMockCleanKey) !=
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed?.state?.flowers)) {
-        parsed.state.flowers = parsed.state.flowers.map((f) => ({
+        parsed.state.flowers = parsed.state.flowers.map((f: any) => ({
           ...f,
           color: (f.color === 'Đa sắc' ? '' : (f.color || '')),
           origin: (f.origin === 'Đà Lạt' ? '' : (f.origin || '')),

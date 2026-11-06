@@ -9,6 +9,7 @@ import {
   Truck,
   Users,
   Wallet,
+  ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -91,5 +92,12 @@ export const NAV_ITEMS: NavItem[] = [
     descriptionKey: 'Đội ngũ nhân sự & nghệ nhân cắm hoa',
     icon: Users,
     gradient: 'bg-gradient-to-br from-sky-500 to-sky-700',
+  },
+  {
+    path: '/phan-quyen',
+    nameKey: 'Phân quyền',
+    descriptionKey: 'Thiết lập quyền xem, thêm, sửa, xoá theo nhân sự',
+    icon: ShieldCheck,
+    gradient: 'bg-gradient-to-br from-blue-600 to-indigo-800',
   },
 ];

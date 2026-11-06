@@ -150,11 +150,7 @@ export default function DonHangNCCPage() {
   }, [orders, searchTerm, selectedStatuses, selectedSuppliers, selectedDebtStatuses]);
 
   // Paginated Data
-  const paginatedData = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredData.slice(start, start + pageSize);
-  }, [filteredData, page, pageSize]);
-
+  
   // Selection handlers
   const handleToggleSelection = (id: string) => {
     setSelectedIds((prev) => {

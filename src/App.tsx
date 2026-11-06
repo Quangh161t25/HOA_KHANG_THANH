@@ -16,6 +16,7 @@ const NPPPage = lazy(() => import('@/modules/npp/NPPPage'));
 const CongNoPage = lazy(() => import('@/modules/cong-no/CongNoPage'));
 const ThuChiPage = lazy(() => import('@/modules/thu-chi/ThuChiPage'));
 const NhanVienPage = lazy(() => import('@/modules/nhan-vien/NhanVienPage'));
+const PhanQuyenPage = lazy(() => import('@/modules/phan-quyen/PhanQuyenPage'));
 
 const PAGE_FALLBACK = (
   <div className="flex-1 flex items-center justify-center py-20">
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="/quan-ly-cong-no" element={<CongNoPage />} />
             <Route path="/thu-chi" element={<ThuChiPage />} />
             <Route path="/nhan-vien" element={<NhanVienPage />} />
+            <Route path="/phan-quyen" element={<PhanQuyenPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

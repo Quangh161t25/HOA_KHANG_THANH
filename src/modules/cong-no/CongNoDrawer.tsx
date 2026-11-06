@@ -280,7 +280,7 @@ export function CongNoDrawer({
       toast.success(
         `Đã tạo phiếu công nợ (${entryType === 'order' ? 'Theo đơn' : 'Theo ngày'}) cho ${
           partnerType === 'npp' ? 'NPP' : 'NCC'
-        } ${selectedPartner.name}`,
+        } ${selectedPartner?.name || ''}`,
       );
     } else if (mode === 'edit' && record) {
       updateRecord(record.id, payload);

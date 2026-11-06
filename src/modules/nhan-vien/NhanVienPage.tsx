@@ -119,11 +119,7 @@ export default function NhanVienPage() {
     });
   }, [employees, searchTerm, selectedDepts, selectedStatuses]);
 
-  const paginatedData = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredData.slice(start, start + pageSize);
-  }, [filteredData, page, pageSize]);
-
+  
   const handleToggleSelection = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);

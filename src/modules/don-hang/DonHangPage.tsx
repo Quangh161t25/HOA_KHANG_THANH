@@ -208,11 +208,7 @@ export default function DonHangPage() {
   }, [orders, searchTerm, selectedStatuses, selectedPartners, selectedDebtStatuses, overdueCustomerMap]);
 
   // Paginated Data
-  const paginatedData = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredData.slice(start, start + pageSize);
-  }, [filteredData, page, pageSize]);
-
+  
   // Selection handlers
   const handleToggleSelection = (id: string) => {
     setSelectedIds((prev) => {

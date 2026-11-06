@@ -109,11 +109,7 @@ export default function NCCPage() {
     });
   }, [suppliers, searchTerm, selectedStatuses, selectedRegions]);
 
-  const paginatedData = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredData.slice(start, start + pageSize);
-  }, [filteredData, page, pageSize]);
-
+  
   const handleToggleSelection = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
