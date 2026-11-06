@@ -206,21 +206,31 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
     // --- 1. DANH_SACH_HOA ---
     const flowerRows = sheetMap['DANH_SACH_HOA'] || [];
     if (flowerRows.length > 0) {
-      const flowers: Flower[] = flowerRows.filter((r) => r[0] && r[1]).map((r, idx) => ({
-        id: `hoa-sync-${idx + 1}`,
-        code: String(r[0] || '').trim(),
-        name: String(r[1] || '').trim(),
-        customName: r[2] ? String(r[2]).trim() : undefined,
-        unit: String(r[3] || 'cành').trim(),
-        category: String(r[4] || 'Khác').trim(),
-        costPrice: 0,
-        wholesalePrice: 0,
-        stock: 100,
-        origin: 'Đà Lạt',
-        color: 'Đa sắc',
-        status: (r[5] === 'Tạm hết' ? 'out_of_stock' : 'active') as Flower['status'],
-        description: String(r[6] || '').trim(),
-      }));
+      const existingFlowers = useFlowerStore.getState().flowers;
+      const existingFlowerMap = new Map(existingFlowers.map((f) => [f.code, f]));
+      const existingFlowerNameMap = new Map(existingFlowers.map((f) => [f.name, f]));
+
+      const flowers: Flower[] = flowerRows.filter((r) => r[0] && r[1]).map((r, idx) => {
+        const code = String(r[0] || '').trim();
+        const name = String(r[1] || '').trim();
+        const prev = existingFlowerMap.get(code) || existingFlowerNameMap.get(name);
+
+        return {
+          id: prev?.id || `hoa-sync-${idx + 1}`,
+          code,
+          name,
+          customName: r[2] ? String(r[2]).trim() : (prev?.customName || ''),
+          unit: r[3] ? String(r[3]).trim() : (prev?.unit || ''),
+          category: r[4] ? String(r[4]).trim() : (prev?.category || ''),
+          costPrice: prev?.costPrice || 0,
+          wholesalePrice: prev?.wholesalePrice || 0,
+          stock: prev?.stock || 0,
+          origin: prev?.origin || '',
+          color: prev?.color || '',
+          status: (r[5] === 'Tạm hết' ? 'out_of_stock' : (r[5] ? 'active' : (prev?.status || 'active'))) as Flower['status'],
+          description: String(r[6] || prev?.description || '').trim(),
+        };
+      });
       useFlowerStore.setState({ flowers });
       counts['hoa'] = flowers.length;
     }

@@ -28,13 +28,13 @@ export function HoaDrawer({ isOpen, onClose, flower, mode = 'create' }: Props) {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [customName, setCustomName] = useState('');
-  const [category, setCategory] = useState(CATEGORIES[0]);
-  const [unit, setUnit] = useState(UNITS[0]);
-  const [origin, setOrigin] = useState(ORIGINS[0]);
+  const [category, setCategory] = useState('');
+  const [unit, setUnit] = useState('');
+  const [origin, setOrigin] = useState('');
   const [color, setColor] = useState('');
   const [costPrice, setCostPrice] = useState(0);
   const [wholesalePrice, setWholesalePrice] = useState(0);
-  const [stock, setStock] = useState(100);
+  const [stock, setStock] = useState(0);
   const [status, setStatus] = useState<Flower['status']>('active');
   const [description, setDescription] = useState('');
 
@@ -45,27 +45,27 @@ export function HoaDrawer({ isOpen, onClose, flower, mode = 'create' }: Props) {
       setCode(flower.code);
       setName(flower.name);
       setCustomName(flower.customName || '');
-      setCategory(flower.category);
-      setUnit(flower.unit);
-      setOrigin(flower.origin);
-      setColor(flower.color);
+      setCategory(flower.category || '');
+      setUnit(flower.unit || '');
+      setOrigin(flower.origin || '');
+      setColor(flower.color || '');
       setCostPrice(flower.costPrice || 0);
       setWholesalePrice(flower.wholesalePrice || 0);
-      setStock(flower.stock);
-      setStatus(flower.status);
+      setStock(flower.stock || 0);
+      setStatus(flower.status || 'active');
       setDescription(flower.description || '');
     } else {
       const nextNum = flowers.length + 1;
       setCode(`HOA-${String(nextNum).padStart(3, '0')}`);
       setName('');
       setCustomName('');
-      setCategory(CATEGORIES[0]);
-      setUnit(UNITS[0]);
-      setOrigin(ORIGINS[0]);
-      setColor('Đỏ');
+      setCategory('');
+      setUnit('');
+      setOrigin('');
+      setColor('');
       setCostPrice(0);
       setWholesalePrice(0);
-      setStock(200);
+      setStock(0);
       setStatus('active');
       setDescription('');
     }
@@ -240,6 +240,7 @@ export function HoaDrawer({ isOpen, onClose, flower, mode = 'create' }: Props) {
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground"
               >
+                <option value="">-- Chưa chọn chủng loại --</option>
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -287,6 +288,7 @@ export function HoaDrawer({ isOpen, onClose, flower, mode = 'create' }: Props) {
                 onChange={(e) => setUnit(e.target.value)}
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground"
               >
+                <option value="">-- Chưa chọn đơn vị tính --</option>
                 {UNITS.map((u) => (
                   <option key={u} value={u}>
                     {u}
@@ -313,6 +315,7 @@ export function HoaDrawer({ isOpen, onClose, flower, mode = 'create' }: Props) {
                 onChange={(e) => setOrigin(e.target.value)}
                 className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground"
               >
+                <option value="">-- Chưa chọn xuất xứ --</option>
                 {ORIGINS.map((o) => (
                   <option key={o} value={o}>
                     {o}
