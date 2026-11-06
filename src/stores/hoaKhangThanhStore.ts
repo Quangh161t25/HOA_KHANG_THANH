@@ -1,3 +1,4 @@
+import { computeAllOrdersVirtualDebt } from '@/lib/orderDebtHelper';
 import { watchModule } from './moduleAuditStore';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -818,100 +819,59 @@ export function recalcDistributorDebts(distId?: string) {
     totalRevenue: totalSales,
   });
 
-  // Đồng bộ cột ảo Công nợ cũ & Thanh toán cho các đơn hàng của NPP này theo dòng thời gian
-  const pRecords = debtStore.records.filter(
-    (r) =>
-      r.partnerType === 'npp' &&
-      (r.partnerId === dist.id ||
-        (r.partnerName && r.partnerName.trim().toLowerCase() === dist.name.trim().toLowerCase())),
-  );
+  // Tự động tính toán lại và đồng bộ công nợ cũ & thanh toán cho toàn bộ đơn hàng liên quan của NPP này
+  const allOrders = orderStore.orders;
+  const allDebtRecords = debtStore.records;
+  const allDistributors = distStore.distributors;
 
-  const chronological = [...pRecords].sort((a, b) => {
-    const dc = a.date.localeCompare(b.date);
-    if (dc !== 0) return dc;
-    const aIsThu = a.type === 'thu' || ((a.decreaseAmount || 0) > 0 && (a.increaseAmount || 0) === 0);
-    const bIsThu = b.type === 'thu' || ((b.decreaseAmount || 0) > 0 && (b.increaseAmount || 0) === 0);
-    if (!aIsThu && bIsThu) return -1;
-    if (aIsThu && !bIsThu) return 1;
-    return a.id.localeCompare(b.id);
+  const vMap = computeAllOrdersVirtualDebt(allOrders, allDebtRecords, allDistributors);
+
+  let hasOrderChange = false;
+  const nextOrders = allOrders.map((o) => {
+    const v = vMap.get(o.id);
+    if (v && (o.oldDebt !== v.oldDebt || o.totalPayment !== v.totalPayment)) {
+      hasOrderChange = true;
+      return {
+        ...o,
+        oldDebt: v.oldDebt,
+        totalPayment: v.totalPayment,
+        debtAmount: Math.max(0, v.totalPayment - (o.paidAmount || 0)),
+      };
+    }
+    return o;
   });
 
-  let running = dist.oldDebt || 0;
-  const orderDebtMap = new Map<string, { oldDebt: number; totalPayment: number }>();
-  const recordDebtMap = new Map<string, { oldDebt: number; finalDebt: number }>();
-
-  chronological.forEach((row) => {
-    const isThu = row.type === 'thu' || ((row.decreaseAmount || 0) > 0 && (row.increaseAmount || 0) === 0);
-    const amt = row.amount !== undefined ? row.amount : (isThu ? (row.decreaseAmount || 0) : (row.increaseAmount || 0));
-
-    const priorDebt = running;
-
-    const matchedOrder = distOrders.find(
-      (o) =>
-        o.code === row.referenceCode ||
-        o.id === row.referenceCode ||
-        row.id === `debt-dh-${o.id}` ||
-        row.id === `debt-order-${o.id}` ||
-        (row.notes && o.code && row.notes.includes(o.code)),
-    );
-
-    if (matchedOrder) {
-      const total = matchedOrder.totalAmount || 0;
-      orderDebtMap.set(matchedOrder.id, {
-        oldDebt: priorDebt,
-        totalPayment: total + priorDebt,
-      });
-    }
-
-    if (isThu) {
-      running -= amt;
-    } else {
-      running += amt;
-    }
-
-    recordDebtMap.set(row.id, {
-      oldDebt: priorDebt,
-      finalDebt: running,
-    });
-  });
-
-  if (orderDebtMap.size > 0) {
-    let hasOrderChange = false;
-    const nextOrders = orderStore.orders.map((o) => {
-      const debtInfo = orderDebtMap.get(o.id);
-      if (debtInfo && (o.oldDebt !== debtInfo.oldDebt || o.totalPayment !== debtInfo.totalPayment)) {
-        hasOrderChange = true;
-        return {
-          ...o,
-          oldDebt: debtInfo.oldDebt,
-          totalPayment: debtInfo.totalPayment,
-        };
-      }
-      return o;
-    });
-    if (hasOrderChange) {
-      useOrderStore.setState({ orders: nextOrders });
-    }
+  if (hasOrderChange) {
+    useOrderStore.setState({ orders: nextOrders });
   }
 
-  if (recordDebtMap.size > 0) {
-    let hasRecordChange = false;
-    const nextRecords = debtStore.records.map((r) => {
-      const info = recordDebtMap.get(r.id);
-      if (info && (r.oldDebt !== info.oldDebt || r.finalDebt !== info.finalDebt || r.remainingDebt !== info.finalDebt)) {
-        hasRecordChange = true;
-        return {
-          ...r,
-          oldDebt: info.oldDebt,
-          finalDebt: info.finalDebt,
-          remainingDebt: info.finalDebt,
-        };
-      }
-      return r;
-    });
-    if (hasRecordChange) {
-      useDebtStore.setState({ records: nextRecords });
+  const orderDebtInfoMap = new Map<string, { oldDebt: number; totalPayment: number; finalDebt: number }>();
+  allOrders.forEach((o) => {
+    const v = vMap.get(o.id);
+    if (v) {
+      orderDebtInfoMap.set(o.code, { oldDebt: v.oldDebt, totalPayment: v.totalPayment, finalDebt: v.finalDebt });
+      orderDebtInfoMap.set(o.id, { oldDebt: v.oldDebt, totalPayment: v.totalPayment, finalDebt: v.finalDebt });
     }
+  });
+
+  let hasRecordChange = false;
+  const nextRecords = allDebtRecords.map((r) => {
+    if (r.partnerType !== 'npp') return r;
+    const info = (r.referenceCode ? orderDebtInfoMap.get(r.referenceCode) : undefined) ||
+                 (r.id.startsWith('debt-dh-') ? orderDebtInfoMap.get(r.id.replace('debt-dh-', '')) : undefined);
+    if (info && (r.oldDebt !== info.oldDebt || r.finalDebt !== info.finalDebt || r.remainingDebt !== info.finalDebt)) {
+      hasRecordChange = true;
+      return {
+        ...r,
+        oldDebt: info.oldDebt,
+        finalDebt: info.finalDebt,
+        remainingDebt: info.finalDebt,
+      };
+    }
+    return r;
+  });
+  if (hasRecordChange) {
+    useDebtStore.setState({ records: nextRecords });
   }
 }
 

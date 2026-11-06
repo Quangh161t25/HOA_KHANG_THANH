@@ -27,6 +27,7 @@ import {
 } from '@/stores/hoaKhangThanhStore';
 import type { Flower, Order, OrderItem } from '@/types/hoaKhangThanh';
 import { checkCustomerOverdueDebt } from '@/lib/debtCheck';
+import { getDistributorDebtAsOfDate } from '@/lib/orderDebtHelper';
 import { formatDate } from '@/lib/format';
 
 dayjs.extend(customParseFormat);
@@ -426,6 +427,21 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
 
   // Items
   const [items, setItems] = useState<OrderItem[]>([]);
+  // Tự động tính lại công nợ cũ của đối tác tính đến đúng mốc ngày orderDate
+  useEffect(() => {
+    if (!orderToEdit && isOpen && partnerName) {
+      const debt = getDistributorDebtAsOfDate(
+        distributorId,
+        partnerName,
+        orderDate,
+        orders,
+        debtRecords,
+        distributors,
+      );
+      setOldDebt(debt);
+    }
+  }, [orderDate, distributorId, partnerName, isOpen, orderToEdit, orders, debtRecords, distributors]);
+
 
   // Thanh tìm kiếm nhanh & thêm hoa (Quick Add Bar)
   const [quickSearch, setQuickSearch] = useState('');
@@ -1620,20 +1636,16 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
                     <button
                       type="button"
                       onClick={() => {
-                        const pRecords = debtRecords.filter(
-                          (r) =>
-                            r.partnerType === 'npp' &&
-                            (r.partnerId === selectedDistributor.id ||
-                              r.partnerName.trim().toLowerCase() === selectedDistributor.name.trim().toLowerCase()),
+                        const debt = getDistributorDebtAsOfDate(
+                          selectedDistributor.id,
+                          selectedDistributor.name,
+                          orderDate,
+                          orders,
+                          debtRecords,
+                          distributors,
+                          orderToEdit?.id,
                         );
-                        let run = selectedDistributor.oldDebt || 0;
-                        const sorted = [...pRecords].sort((a, b) => a.date.localeCompare(b.date));
-                        sorted.forEach((r) => {
-                          const isThu = r.type === 'thu' || ((r.decreaseAmount || 0) > 0 && (r.increaseAmount || 0) === 0);
-                          const amt = r.amount !== undefined ? r.amount : (isThu ? (r.decreaseAmount || 0) : (r.increaseAmount || 0));
-                          run += isThu ? -amt : amt;
-                        });
-                        setOldDebt(run);
+                        setOldDebt(debt);
                       }}
                       className="text-[10px] text-primary hover:underline font-semibold block mt-0.5"
                       title="Lấy số công nợ hiện tại theo dòng tiền thực tế của NPP"
