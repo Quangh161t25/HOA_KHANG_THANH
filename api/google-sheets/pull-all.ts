@@ -1,1 +1,1 @@
-export { googleSheetsHandler as default } from '../../src/server/googleSheetsHandler.ts';
+export { googleSheetsHandler as default } from '../../src/server/googleSheetsHandler.js';

@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { GOOGLE_SHEETS_CONFIG } from '../config/googleSheetsConfig.ts';
+import { GOOGLE_SHEETS_CONFIG } from '../config/googleSheetsConfig.js';
 
 const { spreadsheetId, serviceAccount } = GOOGLE_SHEETS_CONFIG;
 
