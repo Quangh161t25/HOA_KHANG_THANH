@@ -48,6 +48,43 @@ export interface SyncResult {
   error?: string;
 }
 
+
+/**
+ * Chuyển đổi an toàn giá trị số từ ô Google Sheets thành số nguyên / thực
+ * Hỗ trợ các định dạng tiền Việt Nam (VD: "11.450.000", "15,570,000", "4.740.000 đ", " 15.000.000 ")
+ * Tránh lỗi Number("11.450.000") trả về NaN dẫn tới công nợ cũ bị hiển thị 0
+ */
+export function parseSheetNumber(val: unknown): number {
+  if (val === undefined || val === null || val === '') return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  const str = String(val).trim();
+  if (!str) return 0;
+
+  let cleaned = str.replace(/\s+/g, '').replace(/[₫đVNDvnd$]/g, '');
+  if (!cleaned) return 0;
+
+  if (cleaned.includes('.') && !cleaned.includes(',')) {
+    if ((cleaned.match(/\./g) || []).length > 1 || /\.\d{3}$/.test(cleaned)) {
+      cleaned = cleaned.replace(/\./g, '');
+    }
+  } else if (cleaned.includes('.') && cleaned.includes(',')) {
+    if (cleaned.indexOf('.') < cleaned.indexOf(',')) {
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    } else {
+      cleaned = cleaned.replace(/,/g, '');
+    }
+  } else if (cleaned.includes(',')) {
+    if ((cleaned.match(/,/g) || []).length > 1 || /,\d{3}$/.test(cleaned)) {
+      cleaned = cleaned.replace(/,/g, '');
+    } else {
+      cleaned = cleaned.replace(',', '.');
+    }
+  }
+
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
+}
+
 /**
  * Kiểm tra trạng thái kết nối tới Google Spreadsheet
  */
@@ -191,23 +228,39 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
     // --- 2. NHA_PHAN_PHOI ---
     const nppRows = sheetMap['NHA_PHAN_PHOI'] || [];
     if (nppRows.length > 0) {
-      const distributors: Distributor[] = nppRows.filter((r) => r[0] && r[1]).map((r, idx) => ({
-        id: `npp-sync-${idx + 1}`,
-        code: String(r[0] || '').trim(),
-        name: String(r[1] || '').trim(),
-        representative: String(r[2] || '').trim(),
-        phone: String(r[3] || '').trim(),
-        email: '',
-        address: String(r[4] || '').trim(),
-        region: String(r[5] || '').trim(),
-        tier: 'VIP 1 (Kim Cương)',
-        discount: 0,
-        oldDebt: Number(r[6]) || 0,
-        totalRevenue: Number(r[7]) || 0,
-        collectedAmount: Number(r[8]) || 0,
-        currentDebt: Number(r[9]) || 0,
-        status: 'active' as const,
-      }));
+      const existingNpp = useDistributorStore.getState().distributors;
+      const existingNppMap = new Map(existingNpp.map((d) => [d.code, d]));
+      const existingNppNameMap = new Map(existingNpp.map((d) => [d.name, d]));
+
+      const distributors: Distributor[] = nppRows.filter((r) => r[0] && r[1]).map((r, idx) => {
+        const code = String(r[0] || '').trim();
+        const name = String(r[1] || '').trim();
+        const prev = existingNppMap.get(code) || existingNppNameMap.get(name);
+        const oldDebt = parseSheetNumber(r[6]);
+        const totalRevenue = parseSheetNumber(r[7]);
+        const collectedAmount = parseSheetNumber(r[8]);
+        const currentDebt = parseSheetNumber(r[9]) || (oldDebt + totalRevenue - collectedAmount);
+
+        return {
+          id: prev?.id || `npp-sync-${idx + 1}`,
+          code,
+          name,
+          representative: String(r[2] || '').trim() || prev?.representative || '',
+          phone: String(r[3] || '').trim() || prev?.phone || '',
+          email: prev?.email || '',
+          address: String(r[4] || '').trim() || prev?.address || '',
+          region: String(r[5] || '').trim() || prev?.region || 'Miền Nam',
+          tier: prev?.tier || 'VIP 1 (Kim Cương)',
+          discount: prev?.discount || 0,
+          oldDebt,
+          totalRevenue,
+          salesAmount: totalRevenue,
+          collectedAmount,
+          currentDebt,
+          finalDebt: currentDebt,
+          status: 'active' as const,
+        };
+      });
       useDistributorStore.setState({ distributors });
       counts['npp'] = distributors.length;
     }
@@ -215,22 +268,37 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
     // --- 3. NHA_CUNG_CAP ---
     const nccRows = sheetMap['NHA_CUNG_CAP'] || [];
     if (nccRows.length > 0) {
-      const suppliers: Supplier[] = nccRows.filter((r) => r[0] && r[1]).map((r, idx) => ({
-        id: `ncc-sync-${idx + 1}`,
-        code: String(r[0] || '').trim(),
-        name: String(r[1] || '').trim(),
-        contactPerson: String(r[2] || '').trim(),
-        phone: String(r[3] || '').trim(),
-        email: '',
-        address: String(r[4] || '').trim(),
-        specialties: r[5] ? String(r[5]).split(',').map((s: string) => s.trim()) : ['Hoa tươi'],
-        rating: 5,
-        oldDebt: Number(r[6]) || 0,
-        importAmount: Number(r[7]) || 0,
-        paidAmount: Number(r[8]) || 0,
-        totalDebt: Number(r[9]) || 0,
-        status: 'active' as const,
-      }));
+      const existingNcc = useSupplierStore.getState().suppliers;
+      const existingNccMap = new Map(existingNcc.map((s) => [s.code, s]));
+      const existingNccNameMap = new Map(existingNcc.map((s) => [s.name, s]));
+
+      const suppliers: Supplier[] = nccRows.filter((r) => r[0] && r[1]).map((r, idx) => {
+        const code = String(r[0] || '').trim();
+        const name = String(r[1] || '').trim();
+        const prev = existingNccMap.get(code) || existingNccNameMap.get(name);
+        const oldDebt = parseSheetNumber(r[6]);
+        const importAmount = parseSheetNumber(r[7]);
+        const paidAmount = parseSheetNumber(r[8]);
+        const totalDebt = parseSheetNumber(r[9]) || (oldDebt + importAmount - paidAmount);
+
+        return {
+          id: prev?.id || `ncc-sync-${idx + 1}`,
+          code,
+          name,
+          contactPerson: String(r[2] || '').trim() || prev?.contactPerson || '',
+          phone: String(r[3] || '').trim() || prev?.phone || '',
+          email: prev?.email || '',
+          address: String(r[4] || '').trim() || prev?.address || '',
+          specialties: r[5] ? String(r[5]).split(',').map((s) => s.trim()) : prev?.specialties || ['Hoa tươi'],
+          rating: parseSheetNumber(r[10]) || prev?.rating || 5,
+          oldDebt,
+          importAmount,
+          paidAmount,
+          totalDebt,
+          finalDebt: totalDebt,
+          status: 'active' as const,
+        };
+      });
       useSupplierStore.setState({ suppliers });
       counts['ncc'] = suppliers.length;
     }
@@ -255,7 +323,7 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
           phone: String(r[6] || '').trim(),
           email: String(r[7] || '').trim(),
           joinDate: String(r[8] || '').trim(),
-          salary: Number(r[9]) || 0,
+          salary: parseSheetNumber(r[9]) || 0,
           status: 'active' as Employee['status'],
           password: prev?.password,
         };
@@ -269,9 +337,9 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
     const tonKhoRows = sheetMap['TON_KHO'] || [];
     if (tonKhoRows.length > 0) {
       const inventory: InventoryItem[] = tonKhoRows.filter((r) => r[0] && r[1]).map((r) => {
-        const currentStock = Number(r[3]) || 0;
-        const minStock = Number(r[4]) || 0;
-        const maxStock = Number(r[5]) || 0;
+        const currentStock = parseSheetNumber(r[3]) || 0;
+        const minStock = parseSheetNumber(r[4]) || 0;
+        const maxStock = parseSheetNumber(r[5]) || 0;
         const status: InventoryItem['status'] =
           currentStock === 0 ? 'out' : currentStock <= minStock ? 'low' : currentStock > maxStock ? 'excess' : 'normal';
         return {
@@ -284,7 +352,7 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
           currentStock,
           minStock,
           maxStock,
-          costPrice: Number(r[6]) || 0,
+          costPrice: parseSheetNumber(r[6]) || 0,
           lastImportDate: String(r[9] || '').trim(),
           shelfLifeDays: 7,
           freshness: String(r[10] || '').trim(),
@@ -305,7 +373,7 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
         date: String(r[1] || '').trim(),
         type: (r[2] === 'Thu' ? 'income' : 'expense') as CashTransaction['type'],
         category: String(r[3] || '').trim(),
-        amount: Number(r[4]) || 0,
+        amount: parseSheetNumber(r[4]) || 0,
         partner: String(r[5] || '').trim(),
         paymentMethod: (String(r[6] || 'Tiền mặt').trim()) as CashTransaction['paymentMethod'],
         creator: String(r[7] || '').trim(),
@@ -327,9 +395,9 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
         partnerCode: '',
         partnerName: String(r[1] || '').trim(),
         type: (r[3] === 'thu' || r[3] === 'Thu' ? 'thu' : 'chi') as DebtDailyRecord['type'],
-        amount: Number(r[4]) || 0,
-        remainingDebt: Number(r[5]) || 0,
-        finalDebt: Number(r[5]) || 0,
+        amount: parseSheetNumber(r[4]) || 0,
+        remainingDebt: parseSheetNumber(r[5]) || 0,
+        finalDebt: parseSheetNumber(r[5]) || 0,
         referenceCode: String(r[6] || '').trim(),
         creator: String(r[7] || '').trim(),
         notes: String(r[8] || '').trim(),
@@ -352,15 +420,15 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
         distributorName: String(r[2] || '').trim(),
         phone: String(r[3] || '').trim(),
         address: String(r[4] || '').trim(),
-        totalQuantity: Number(r[5]) || 0,
-        itemsSubtotal: Number(r[6]) || 0,
-        shippingFee: Number(r[7]) || 0,
-        discount: Number(r[8]) || 0,
-        totalAmount: Number(r[9]) || 0,
-        oldDebt: Number(r[10]) || 0,
-        totalPayment: Number(r[11]) || 0,
-        paidAmount: Number(r[12]) || 0,
-        debtAmount: Number(r[13]) || 0,
+        totalQuantity: parseSheetNumber(r[5]) || 0,
+        itemsSubtotal: parseSheetNumber(r[6]) || 0,
+        shippingFee: parseSheetNumber(r[7]) || 0,
+        discount: parseSheetNumber(r[8]) || 0,
+        totalAmount: parseSheetNumber(r[9]) || 0,
+        oldDebt: parseSheetNumber(r[10]) || 0,
+        totalPayment: parseSheetNumber(r[11]) || 0,
+        paidAmount: parseSheetNumber(r[12]) || 0,
+        debtAmount: parseSheetNumber(r[13]) || 0,
         status: (String(r[14] || 'nhap').trim()) as Order['status'],
         paymentStatus: (String(r[15] || 'unpaid').trim()) as Order['paymentStatus'],
         creator: String(r[16] || '').trim(),
@@ -381,13 +449,13 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
         code: String(r[0] || '').trim(),
         orderDate: String(r[1] || '').trim(),
         supplierName: String(r[2] || '').trim(),
-        totalQuantity: Number(r[3]) || 0,
-        itemsSubtotal: Number(r[4]) || 0,
-        shippingFee: Number(r[5]) || 0,
+        totalQuantity: parseSheetNumber(r[3]) || 0,
+        itemsSubtotal: parseSheetNumber(r[4]) || 0,
+        shippingFee: parseSheetNumber(r[5]) || 0,
         discount: 0,
-        totalAmount: Number(r[6]) || 0,
-        paidAmount: Number(r[7]) || 0,
-        debtAmount: Number(r[8]) || 0,
+        totalAmount: parseSheetNumber(r[6]) || 0,
+        paidAmount: parseSheetNumber(r[7]) || 0,
+        debtAmount: parseSheetNumber(r[8]) || 0,
         status: (String(r[9] || 'nhap').trim()) as SupplierOrder['status'],
         paymentStatus: 'unpaid' as SupplierOrder['paymentStatus'],
         creator: String(r[10] || '').trim(),
