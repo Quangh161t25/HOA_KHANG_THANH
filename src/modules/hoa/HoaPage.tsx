@@ -313,7 +313,7 @@ export default function HoaPage() {
 
           <div className="flex-1 min-h-0">
             <DataTable<Flower>
-              data={paginatedData}
+              data={filteredData}
               columns={columns}
               selectedIds={selectedIds}
               onToggleSelection={handleToggleSelection}

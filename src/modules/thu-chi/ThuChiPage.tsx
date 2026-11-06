@@ -419,7 +419,7 @@ export default function ThuChiPage() {
 
           <div className="flex-1 min-h-0">
             <DataTable<CashTransaction>
-              data={paginatedData}
+              data={filteredData}
               columns={columns}
               selectedIds={selectedIds}
               onToggleSelection={handleToggleSelection}

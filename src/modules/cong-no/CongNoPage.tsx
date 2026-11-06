@@ -1238,7 +1238,7 @@ export default function CongNoPage() {
           {/* Main DataTable */}
           <div className="flex-1 min-h-0 overflow-hidden">
             <DataTable<DebtDailyRecord>
-              data={paginatedData}
+              data={filteredData}
               columns={columns}
               isLoading={false}
               selectedIds={selectedIds}

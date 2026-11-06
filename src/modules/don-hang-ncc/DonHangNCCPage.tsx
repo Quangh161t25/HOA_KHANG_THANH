@@ -533,7 +533,7 @@ export default function DonHangNCCPage() {
           {/* DATA TABLE */}
           <div className="flex-1 min-h-0">
             <DataTable<SupplierOrder>
-              data={paginatedData}
+              data={filteredData}
               columns={columns}
               selectedIds={selectedIds}
               onToggleSelection={handleToggleSelection}

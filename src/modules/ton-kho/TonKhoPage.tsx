@@ -320,7 +320,7 @@ export default function TonKhoPage() {
 
           <div className="flex-1 min-h-0">
             <DataTable<InventoryItem>
-              data={paginatedData}
+              data={filteredData}
               columns={columns}
               selectedIds={selectedIds}
               onToggleSelection={handleToggleSelection}

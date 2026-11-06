@@ -147,6 +147,94 @@ export interface DataTableProps<T> {
 }
 
 /** Bảng dữ liệu dùng chung (desktop: bảng có cột dính; mobile: danh sách thẻ). */
+
+function getRowValue(row: any, colId: string): any {
+  if (!row || typeof row !== 'object') return '';
+  if (row[colId] !== undefined && row[colId] !== null) return row[colId];
+
+  switch (colId) {
+    case 'partner':
+      return row.distributorName || row.partnerName || row.supplierName || row.partner || '';
+    case 'debt':
+    case 'oldDebt':
+      return row.oldDebt ?? row.totalDebt ?? row.currentDebt ?? 0;
+    case 'totalPayment':
+      return row.totalPayment ?? ((row.totalAmount || 0) + (row.oldDebt || 0));
+    case 'salesAmount':
+      return row.salesAmount ?? row.totalRevenue ?? 0;
+    case 'collectedAmount':
+      return row.collectedAmount ?? 0;
+    case 'importAmount':
+      return row.importAmount ?? 0;
+    case 'paidAmount':
+      return row.paidAmount ?? 0;
+    case 'finalDebt':
+      if (row.finalDebt !== undefined) return row.finalDebt;
+      if (row.totalDebt !== undefined) return row.totalDebt;
+      if (row.currentDebt !== undefined) return row.currentDebt;
+      return (row.oldDebt || 0) + (row.salesAmount || row.totalRevenue || row.importAmount || 0) - (row.collectedAmount || row.paidAmount || 0);
+    case 'orderDate':
+    case 'deliveryDate':
+    case 'date':
+      return row.orderDate || row.date || row.joinDate || '';
+    case 'lastOrder':
+      return row.lastOrderDate || '';
+    case 'code':
+    case 'flowerCode':
+      return row.code || row.flowerCode || '';
+    case 'name':
+    case 'flowerName':
+    case 'fullName':
+      return row.name || row.flowerName || row.fullName || '';
+    case 'totalQuantity':
+    case 'stock':
+    case 'currentStock':
+      return row.totalQuantity ?? row.stock ?? row.currentStock ?? 0;
+    case 'totalAmount':
+    case 'amount':
+      return row.totalAmount ?? row.amount ?? 0;
+    case 'itemsSubtotal':
+      return row.itemsSubtotal ?? 0;
+    case 'shippingFee':
+      return row.shippingFee ?? 0;
+    case 'discount':
+      return row.discount ?? 0;
+    case 'salary':
+      return row.salary ?? 0;
+    case 'remainingDebt':
+      return row.remainingDebt ?? row.finalDebt ?? 0;
+    default:
+      return row[colId] ?? '';
+  }
+}
+
+function compareValues(a: any, b: any): number {
+  if (a === b) return 0;
+  if (a === undefined || a === null || a === '') return 1;
+  if (b === undefined || b === null || b === '') return -1;
+
+  const numA = typeof a === 'number' ? a : (typeof a === 'string' && /^-?\d+(\.\d+)?$/.test(a.trim()) ? parseFloat(a) : NaN);
+  const numB = typeof b === 'number' ? b : (typeof b === 'string' && /^-?\d+(\.\d+)?$/.test(b.trim()) ? parseFloat(b) : NaN);
+
+  if (!isNaN(numA) && !isNaN(numB)) {
+    return numA - numB;
+  }
+
+  const strA = String(a).trim();
+  const strB = String(b).trim();
+
+  const datePattern = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+  const matchA = strA.match(datePattern);
+  const matchB = strB.match(datePattern);
+  if (matchA && matchB) {
+    const timeA = new Date(Number(matchA[3]), Number(matchA[2]) - 1, Number(matchA[1])).getTime();
+    const timeB = new Date(Number(matchB[3]), Number(matchB[2]) - 1, Number(matchB[1])).getTime();
+    return timeA - timeB;
+  }
+
+  return strA.localeCompare(strB, 'vi', { numeric: true, sensitivity: 'base' });
+}
+
 export function DataTable<T>({
   data,
   columns,
@@ -209,9 +297,30 @@ export function DataTable<T>({
     return map;
   }, [dataCols]);
 
-  const total = data.length;
-  const pageCount = Math.ceil(total / pageSize);
-  const pageRows = useMemo(() => data.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize), [data, page, pageSize]);
+  const [internalSort, setInternalSort] = useState<SortState>({ column: null, direction: null });
+  const activeSort = sort ?? internalSort;
+
+  const sortedData = useMemo(() => {
+    if (!activeSort.column || !activeSort.direction) return data;
+    const colId = activeSort.column;
+    const dir = activeSort.direction;
+
+    return [...data].sort((a, b) => {
+      const valA = getRowValue(a, colId);
+      const valB = getRowValue(b, colId);
+      const res = compareValues(valA, valB);
+      return dir === 'asc' ? res : -res;
+    });
+  }, [data, activeSort]);
+
+  const total = sortedData.length;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const pageRows = useMemo(() => {
+    if (sortedData.length <= pageSize && page === 1) {
+      return sortedData;
+    }
+    return sortedData.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize);
+  }, [sortedData, page, pageSize]);
   const pageIds = pageRows.map(keyExtractor);
   const allChecked = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
   const someChecked = pageIds.some((id) => selectedIds.has(id)) && !allChecked;
@@ -246,14 +355,24 @@ export function DataTable<T>({
 
   const cycleSort = useCallback(
     (id: string) => {
-      if (!onSort) return;
-      if (sort?.column === id) {
-        if (sort.direction === 'asc') onSort(id, 'desc');
-        else if (sort.direction === 'desc') onSort(null, null);
-        else onSort(id, 'asc');
-      } else onSort(id, 'asc');
+      let nextDir: SortDirection = 'desc';
+      if (activeSort.column === id) {
+        if (activeSort.direction === 'desc') nextDir = 'asc';
+        else if (activeSort.direction === 'asc') nextDir = null;
+        else nextDir = 'desc';
+      } else {
+        nextDir = 'desc';
+      }
+
+      const nextCol = nextDir === null ? null : id;
+      if (onSort) {
+        onSort(nextCol, nextDir);
+      } else {
+        setInternalSort({ column: nextCol, direction: nextDir });
+        onPageChange?.(1);
+      }
     },
-    [onSort, sort],
+    [onSort, activeSort, onPageChange],
   );
 
   const resizing = useRef<{ colId: string; startX: number; startW: number } | null>(null);
@@ -430,8 +549,8 @@ export function DataTable<T>({
                 </th>
                 {dataCols.map((c) => {
                   const isSticky = stickyLeftMap.has(c.id);
-                  const sorted = sort?.column === c.id;
-                  const sortable = !!onSort;
+                  const sorted = activeSort.column === c.id;
+                  const sortable = c.id !== 'actions';
                   const style: CSSProperties = columnStyle(c);
                   if (isSticky) style.left = stickyLeftMap.get(c.id);
                   const align = c.align || 'left';
@@ -441,10 +560,11 @@ export function DataTable<T>({
                     <th
                       key={c.id}
                       onClick={() => sortable && cycleSort(c.id)}
+                      title={sortable ? `Bấm để sắp xếp theo ${c.label} (Lớn ➔ Bé / Bé ➔ Lớn)` : undefined}
                       className={cn(
                         'px-4 py-2 font-semibold text-foreground/80 border-b border-border text-xs whitespace-nowrap transition-colors select-none relative',
                         isSticky && 'sticky z-[3] bg-muted border-r border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]',
-                        sortable && 'cursor-pointer hover:text-foreground group',
+                        sortable && 'cursor-pointer hover:bg-muted/80 hover:text-foreground group',
                       )}
                       style={style}
                     >
@@ -454,11 +574,20 @@ export function DataTable<T>({
                           <Pin size={11} className="text-amber-500 fill-amber-500/40 rotate-45 shrink-0" />
                         )}
                         {sortable && (
-                          <span className={cn('transition-opacity', sorted ? 'opacity-100' : 'opacity-0 group-hover:opacity-40')}>
-                            {sorted && sort?.direction === 'desc' ? (
-                              <ArrowDown size={12} className="text-primary" />
+                          <span
+                            className={cn(
+                              'inline-flex items-center justify-center p-0.5 rounded transition-all',
+                              sorted
+                                ? 'opacity-100 bg-primary/10 text-primary font-bold'
+                                : 'opacity-0 group-hover:opacity-60 text-muted-foreground',
+                            )}
+                          >
+                            {sorted && activeSort.direction === 'desc' ? (
+                              <ArrowDown size={13} className="text-primary stroke-[2.5]" />
+                            ) : sorted && activeSort.direction === 'asc' ? (
+                              <ArrowUp size={13} className="text-primary stroke-[2.5]" />
                             ) : (
-                              <ArrowUp size={12} className={sorted ? 'text-primary' : ''} />
+                              <ArrowDown size={11} className="opacity-50" />
                             )}
                           </span>
                         )}
