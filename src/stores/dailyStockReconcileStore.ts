@@ -126,6 +126,9 @@ export const useDailyStockReconcileStore = create<DailyStockReconcileState>()(
           let updatedItems: DailyStockItem[];
           if (existingIndex >= 0) {
             const current = dayItems[existingIndex];
+            if (current.closingStock === closing) {
+              return state; // Không thay đổi thì giữ nguyên, tránh re-render và ghi localStorage thừa
+            }
             const opening = current.openingStock || 0;
             const exportQty = current.dailyExport || 0;
             const calcImport = Math.max(0, closing + exportQty - opening);
@@ -178,6 +181,9 @@ export const useDailyStockReconcileStore = create<DailyStockReconcileState>()(
 
           const current = dayItems[existingIndex];
           const opening = Math.max(0, openingStock || 0);
+          if (current.openingStock === opening && current.isOpeningCustom) {
+            return state;
+          }
           const calcImport = Math.max(0, current.closingStock + current.dailyExport - opening);
 
           const updated: DailyStockItem = {
