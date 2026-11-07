@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  AlertTriangle,
   Calendar,
   CheckCircle2,
   ChevronLeft,
@@ -16,8 +15,6 @@ import {
   ShoppingCart,
   TrendingDown,
   TrendingUp,
-  Truck,
-  Wand2,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
@@ -29,33 +26,38 @@ import {
 } from '@/stores/hoaKhangThanhStore';
 import {
   useDailyStockReconcileStore,
-  computeReconcileStatus,
-  type DailyReconcileItem,
+  getPreviousClosingStock,
+  type DailyStockItem,
 } from '@/stores/dailyStockReconcileStore';
 import { todayISODate, formatDate } from '@/lib/format';
 
-type FilterStatus = 'all' | 'matched' | 'mismatched' | 'shortage' | 'excess';
+interface DisplayRow extends DailyStockItem {
+  differenceWithNCC: number; // Thực nhập NCC - Nhập tính ra
+}
 
 export default function TonNgayPage() {
   const [selectedDate, setSelectedDate] = useState<string>(todayISODate());
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [isAddFlowerModalOpen, setIsAddFlowerModalOpen] = useState(false);
   const [customFlowerId, setCustomFlowerId] = useState('');
+
+  // Modal điều chỉnh Tồn đầu thủ công (nếu ngày đầu tiên chưa có tồn cuối hôm trước)
+  const [editingOpeningItem, setEditingOpeningItem] = useState<DisplayRow | null>(null);
+  const [editingOpeningVal, setEditingOpeningVal] = useState<number>(0);
 
   const { flowers } = useFlowerStore();
   const { orders } = useOrderStore();
   const { orders: supplierOrders } = useSupplierOrderStore();
-  const { records, setRemainingQuantity, setNotes, saveDailyItems } =
+  const { records, setClosingStock, setOpeningStock } =
     useDailyStockReconcileStore();
 
   const formatNumber = (num: number) => {
     return (num || 0).toLocaleString('vi-VN');
   };
 
-  // Tính số lượng khách đặt trong ngày được chọn từ tất cả Đơn hàng
-  const dayOrdersMap = useMemo(() => {
-    const map = new Map<string, { qty: number; orderCount: number }>();
+  // 1. Xuất ngày: Tính tổng số lượng bán từ các Đơn hàng trong ngày được chọn
+  const dailyExportMap = useMemo(() => {
+    const map = new Map<string, number>();
     orders
       .filter((o) => o.orderDate === selectedDate && o.status !== 'huy')
       .forEach((o) => {
@@ -65,20 +67,17 @@ export default function TonNgayPage() {
           const idKey = (item.flowerId || '').trim().toLowerCase();
           const nameKey = (item.flowerName || '').trim().toLowerCase();
 
-          [codeKey, idKey, nameKey].forEach((key) => {
-            if (key) {
-              const prev = map.get(key) || { qty: 0, orderCount: 0 };
-              map.set(key, { qty: prev.qty + qty, orderCount: prev.orderCount + 1 });
-            }
-          });
+          if (codeKey) map.set(codeKey, (map.get(codeKey) || 0) + qty);
+          if (idKey && idKey !== codeKey) map.set(idKey, (map.get(idKey) || 0) + qty);
+          if (nameKey && nameKey !== codeKey) map.set(nameKey, (map.get(nameKey) || 0) + qty);
         });
       });
     return map;
   }, [orders, selectedDate]);
 
-  // Tính số lượng thực tế nhập từ NCC trong ngày được chọn từ Đơn nhập NCC
-  const daySupplierImportsMap = useMemo(() => {
-    const map = new Map<string, { qty: number; poCount: number }>();
+  // Thực nhập NCC trong ngày: Tính từ Đơn nhập NCC của ngày được chọn
+  const supplierImportMap = useMemo(() => {
+    const map = new Map<string, number>();
     supplierOrders
       .filter((o) => o.orderDate === selectedDate && o.status !== 'huy')
       .forEach((o) => {
@@ -88,24 +87,24 @@ export default function TonNgayPage() {
           const idKey = (item.flowerId || '').trim().toLowerCase();
           const nameKey = (item.flowerName || '').trim().toLowerCase();
 
-          [codeKey, idKey, nameKey].forEach((key) => {
-            if (key) {
-              const prev = map.get(key) || { qty: 0, poCount: 0 };
-              map.set(key, { qty: prev.qty + qty, poCount: prev.poCount + 1 });
-            }
-          });
+          if (codeKey) map.set(codeKey, (map.get(codeKey) || 0) + qty);
+          if (idKey && idKey !== codeKey) map.set(idKey, (map.get(idKey) || 0) + qty);
+          if (nameKey && nameKey !== codeKey) map.set(nameKey, (map.get(nameKey) || 0) + qty);
         });
       });
     return map;
   }, [supplierOrders, selectedDate]);
 
-  // Hợp nhất dữ liệu kiểm tồn ngày:
-  // Bao gồm tất cả hoa phát sinh đơn hàng, đơn nhập trong ngày, hoặc đã được lưu trước đó
-  const reconcileItems = useMemo<DailyReconcileItem[]>(() => {
+  // 2. Tính toán bảng dữ liệu Tồn Ngày theo công thức người dùng yêu cầu:
+  // - Tồn đầu: Tồn cuối của ngày hôm trước
+  // - Xuất ngày: Lấy ở đơn hàng theo ngày
+  // - Tồn cuối: Người dùng nhập vào
+  // - Nhập: Tồn cuối + Xuất ngày - Tồn đầu
+  const displayRows = useMemo<DisplayRow[]>(() => {
     const savedDayItems = records[selectedDate] || [];
     const savedMap = new Map(savedDayItems.map((it) => [it.flowerId, it]));
 
-    // Tạo danh sách hoa có phát sinh trong ngày
+    // Xác định danh sách các loại hoa phát sinh hoặc cần kiểm tồn
     const activeFlowerKeys = new Set<string>();
 
     flowers.forEach((fl) => {
@@ -113,43 +112,71 @@ export default function TonNgayPage() {
       const idKey = (fl.id || '').trim().toLowerCase();
       const nameKey = (fl.name || '').trim().toLowerCase();
 
-      const hasOrder = (dayOrdersMap.get(codeKey)?.qty || 0) > 0 || (dayOrdersMap.get(idKey)?.qty || 0) > 0 || (dayOrdersMap.get(nameKey)?.qty || 0) > 0;
-      const hasImport = (daySupplierImportsMap.get(codeKey)?.qty || 0) > 0 || (daySupplierImportsMap.get(idKey)?.qty || 0) > 0 || (daySupplierImportsMap.get(nameKey)?.qty || 0) > 0;
+      const hasExport =
+        (dailyExportMap.get(codeKey) || 0) > 0 ||
+        (dailyExportMap.get(idKey) || 0) > 0 ||
+        (dailyExportMap.get(nameKey) || 0) > 0;
+
+      const hasNCCImport =
+        (supplierImportMap.get(codeKey) || 0) > 0 ||
+        (supplierImportMap.get(idKey) || 0) > 0 ||
+        (supplierImportMap.get(nameKey) || 0) > 0;
+
       const hasSaved = savedMap.has(fl.id) || (codeKey && savedDayItems.some((s) => s.flowerCode?.toLowerCase() === codeKey));
 
-      if (hasOrder || hasImport || hasSaved) {
+      // Kiểm tra xem hôm trước có tồn cuối > 0 không
+      const prevClosing = getPreviousClosingStock(records, selectedDate, fl.id);
+      const hasPrevClosing = prevClosing !== undefined && prevClosing > 0;
+
+      if (hasExport || hasNCCImport || hasSaved || hasPrevClosing) {
         activeFlowerKeys.add(fl.id);
       }
     });
 
-    // Nếu ngày hôm nay chưa có đơn nào, hiển thị danh mục hoa để người dùng kiểm đếm
-    const baseFlowers =
+    // Nếu ngày hôm nay chưa có đơn nào, hiển thị danh mục hoa ban đầu
+    const targetFlowers =
       activeFlowerKeys.size > 0
         ? flowers.filter((f) => activeFlowerKeys.has(f.id))
-        : flowers.slice(0, 30);
+        : flowers.slice(0, 25);
 
-    return baseFlowers.map((fl) => {
+    return targetFlowers.map((fl) => {
       const codeKey = (fl.code || '').trim().toLowerCase();
       const idKey = (fl.id || '').trim().toLowerCase();
       const nameKey = (fl.name || '').trim().toLowerCase();
 
-      const orderQty =
-        (codeKey ? dayOrdersMap.get(codeKey)?.qty : 0) ||
-        (idKey ? dayOrdersMap.get(idKey)?.qty : 0) ||
-        (nameKey ? dayOrdersMap.get(nameKey)?.qty : 0) ||
+      // Xuất ngày từ đơn hàng
+      const exportQty =
+        (codeKey ? dailyExportMap.get(codeKey) : 0) ||
+        (idKey ? dailyExportMap.get(idKey) : 0) ||
+        (nameKey ? dailyExportMap.get(nameKey) : 0) ||
         0;
 
-      const importQty =
-        (codeKey ? daySupplierImportsMap.get(codeKey)?.qty : 0) ||
-        (idKey ? daySupplierImportsMap.get(idKey)?.qty : 0) ||
-        (nameKey ? daySupplierImportsMap.get(nameKey)?.qty : 0) ||
+      // Thực nhập từ NCC
+      const nccImport =
+        (codeKey ? supplierImportMap.get(codeKey) : 0) ||
+        (idKey ? supplierImportMap.get(idKey) : 0) ||
+        (nameKey ? supplierImportMap.get(nameKey) : 0) ||
         0;
 
       const saved = savedMap.get(fl.id);
-      const remainingQty = saved ? saved.remainingQuantity : 0;
-      const openingStock = saved ? (saved.openingStock || 0) : 0;
 
-      const { difference, status } = computeReconcileStatus(openingStock, importQty, orderQty, remainingQty);
+      // Tồn đầu: Ưu tiên tồn cuối hôm trước, nếu người dùng đã tự sửa thì dùng số đã sửa
+      let openingStock = 0;
+      if (saved && saved.isOpeningCustom) {
+        openingStock = saved.openingStock;
+      } else {
+        const prevClosing = getPreviousClosingStock(records, selectedDate, fl.id);
+        openingStock = prevClosing ?? saved?.openingStock ?? 0;
+      }
+
+      // Tồn cuối: Số lượng người dùng nhập vào
+      const closingStock = saved ? (saved.closingStock ?? 0) : 0;
+
+      // Nhập (Tìm ra nhập): Nhập = Tồn cuối + Xuất ngày - Tồn đầu
+      const calculatedImport = Math.max(0, closingStock + exportQty - openingStock);
+
+      // Chênh lệch so với NCC (nếu có đơn nhập)
+      const differenceWithNCC = nccImport > 0 ? nccImport - calculatedImport : 0;
 
       return {
         id: `${selectedDate}_${fl.id}`,
@@ -159,203 +186,167 @@ export default function TonNgayPage() {
         flowerName: fl.name,
         unit: fl.unit || 'cành',
         openingStock,
-        orderQuantity: orderQty,
-        importQuantity: importQty,
-        remainingQuantity: remainingQty,
-        difference,
-        status,
+        dailyExport: exportQty,
+        closingStock,
+        calculatedImport,
+        actualImportFromNCC: nccImport,
+        differenceWithNCC,
         notes: saved?.notes || '',
       };
     });
-  }, [flowers, dayOrdersMap, daySupplierImportsMap, records, selectedDate]);
+  }, [flowers, dailyExportMap, supplierImportMap, records, selectedDate]);
 
-  // Bộ lọc tìm kiếm & trạng thái
-  const filteredItems = useMemo(() => {
-    return reconcileItems.filter((it) => {
-      const q = searchTerm.trim().toLowerCase();
-      const matchSearch =
-        !q ||
-        it.flowerCode.toLowerCase().includes(q) ||
-        it.flowerName.toLowerCase().includes(q);
+  // Bộ lọc tìm kiếm
+  const filteredRows = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return displayRows;
+    return displayRows.filter(
+      (r) =>
+        r.flowerCode.toLowerCase().includes(q) ||
+        r.flowerName.toLowerCase().includes(q),
+    );
+  }, [displayRows, searchTerm]);
 
-      let matchFilter = true;
-      if (filterStatus === 'matched') {
-        matchFilter = it.status === 'matched';
-      } else if (filterStatus === 'mismatched') {
-        matchFilter = it.status !== 'matched';
-      } else if (filterStatus === 'shortage') {
-        matchFilter = it.status === 'shortage';
-      } else if (filterStatus === 'excess') {
-        matchFilter = it.status === 'excess';
-      }
-
-      return matchSearch && matchFilter;
-    });
-  }, [reconcileItems, searchTerm, filterStatus]);
-
-  // Thống kê tổng số lượng toàn ngày
+  // Tổng hợp số liệu chân bảng & KPI
   const summary = useMemo(() => {
-    let totalOrders = 0;
-    let totalImports = 0;
-    let totalRemaining = 0;
-    let totalRequired = 0;
-    let matchedCount = 0;
-    let shortageCount = 0;
-    let excessCount = 0;
+    let sumOpening = 0;
+    let sumExport = 0;
+    let sumClosing = 0;
+    let sumCalculatedImport = 0;
+    let sumActualNCC = 0;
 
-    filteredItems.forEach((it) => {
-      totalOrders += it.orderQuantity;
-      totalImports += it.importQuantity;
-      totalRemaining += it.remainingQuantity;
-      totalRequired += it.orderQuantity + it.remainingQuantity - it.openingStock;
-
-      if (it.status === 'matched') matchedCount++;
-      else if (it.status === 'shortage') shortageCount++;
-      else if (it.status === 'excess') excessCount++;
+    filteredRows.forEach((r) => {
+      sumOpening += r.openingStock;
+      sumExport += r.dailyExport;
+      sumClosing += r.closingStock;
+      sumCalculatedImport += r.calculatedImport;
+      sumActualNCC += r.actualImportFromNCC;
     });
-
-    const netDifference = totalImports - totalRequired;
 
     return {
-      totalItems: filteredItems.length,
-      totalOrders,
-      totalImports,
-      totalRemaining,
-      totalRequired,
-      netDifference,
-      matchedCount,
-      shortageCount,
-      excessCount,
+      count: filteredRows.length,
+      opening: sumOpening,
+      export: sumExport,
+      closing: sumClosing,
+      calculatedImport: sumCalculatedImport,
+      actualNCC: sumActualNCC,
+      diffNCC: sumActualNCC - sumCalculatedImport,
     };
-  }, [filteredItems]);
+  }, [filteredRows]);
 
-  // Thay đổi số lượng hoa còn lại (kiểm đếm)
-  const handleRemainingChange = (item: DailyReconcileItem, newQty: number) => {
-    const qty = Math.max(0, newQty || 0);
-    setRemainingQuantity(selectedDate, item.flowerId, qty, {
+  // Người dùng nhập Tồn cuối
+  const handleClosingStockChange = (item: DisplayRow, value: number) => {
+    const val = Math.max(0, value || 0);
+    setClosingStock(selectedDate, item.flowerId, val, {
       flowerCode: item.flowerCode,
       flowerName: item.flowerName,
       unit: item.unit,
-      orderQuantity: item.orderQuantity,
-      importQuantity: item.importQuantity,
+      dailyExport: item.dailyExport,
       openingStock: item.openingStock,
+      actualImportFromNCC: item.actualImportFromNCC,
     });
   };
 
-  // Tự động điền giá trị hoa còn lại theo lý thuyết = max(0, Nhập - Đơn)
-  const handleAutoFillTheoretical = () => {
-    const updated = reconcileItems.map((it) => {
-      const theoretical = Math.max(0, it.openingStock + it.importQuantity - it.orderQuantity);
-      const { difference, status } = computeReconcileStatus(it.openingStock, it.importQuantity, it.orderQuantity, theoretical);
-      return {
-        ...it,
-        remainingQuantity: theoretical,
-        difference,
-        status,
-      };
-    });
-    saveDailyItems(selectedDate, updated);
-    toast.success('Đã tự động tính và điền số lượng hoa còn lại theo công thức lý thuyết');
+  // Điều chỉnh tồn đầu thủ công
+  const handleOpenEditOpening = (item: DisplayRow) => {
+    setEditingOpeningItem(item);
+    setEditingOpeningVal(item.openingStock);
   };
 
-  // Đặt lại toàn bộ hoa còn lại về 0 để bắt đầu kiểm đếm
-  const handleResetToZero = () => {
-    const updated = reconcileItems.map((it) => {
-      const { difference, status } = computeReconcileStatus(it.openingStock, it.importQuantity, it.orderQuantity, 0);
-      return {
-        ...it,
-        remainingQuantity: 0,
-        difference,
-        status,
-      };
-    });
-    saveDailyItems(selectedDate, updated);
-    toast.success('Đã đặt lại số lượng hoa còn lại về 0');
+  const handleSaveOpeningStock = () => {
+    if (!editingOpeningItem) return;
+    setOpeningStock(selectedDate, editingOpeningItem.flowerId, editingOpeningVal);
+    toast.success(`Đã cập nhật tồn đầu cho hoa "${editingOpeningItem.flowerName}": ${formatNumber(editingOpeningVal)}`);
+    setEditingOpeningItem(null);
   };
 
-  // Đổi ngày tới / lùi 1 ngày
+  // Đổi ngày tới / lùi
   const handleShiftDay = (delta: number) => {
-    const curr = new Date(selectedDate);
-    curr.setDate(curr.getDate() + delta);
-    setSelectedDate(curr.toISOString().split('T')[0]);
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + delta);
+    setSelectedDate(d.toISOString().split('T')[0]);
   };
 
-  // Thêm một hoa ngoài danh sách vào bảng kiểm tồn ngày
+  // Thêm hoa ngoài danh mục vào kiểm tồn
   const handleAddCustomFlower = () => {
     if (!customFlowerId) return;
     const fl = flowers.find((f) => f.id === customFlowerId);
     if (!fl) return;
 
-    setRemainingQuantity(selectedDate, fl.id, 0, {
+    setClosingStock(selectedDate, fl.id, 0, {
       flowerCode: fl.code,
       flowerName: fl.name,
       unit: fl.unit || 'cành',
-      orderQuantity: 0,
-      importQuantity: 0,
+      dailyExport: 0,
       openingStock: 0,
+      actualImportFromNCC: 0,
     });
 
-    toast.success(`Đã thêm hoa "${fl.name}" vào bảng kiểm tồn ngày ${formatDate(selectedDate)}`);
+    toast.success(`Đã thêm hoa "${fl.name}" vào bảng tồn ngày ${formatDate(selectedDate)}`);
     setIsAddFlowerModalOpen(false);
     setCustomFlowerId('');
   };
 
-  // Xuất file Excel (.xlsx) bảng đối soát tồn ngày
+  // Xuất file Excel (.xlsx) bảng Tồn ngày
   const handleExportExcel = () => {
-    if (filteredItems.length === 0) {
-      toast.error('Không có dữ liệu đối soát để xuất Excel');
+    if (filteredRows.length === 0) {
+      toast.error('Không có dữ liệu để xuất Excel');
       return;
     }
 
-    const exportRows = filteredItems.map((it, idx) => ({
+    const exportData = filteredRows.map((r, idx) => ({
       STT: idx + 1,
-      'Mã hoa': it.flowerCode,
-      'Tên hoa': it.flowerName,
-      'ĐVT': it.unit,
-      'Đơn khách đặt (A)': it.orderQuantity,
-      'Thực nhập NCC (B)': it.importQuantity,
-      'Hoa còn lại kiểm đếm (C)': it.remainingQuantity,
-      'Cần nhập theo đơn (A + C)': it.orderQuantity + it.remainingQuantity,
-      'Chênh lệch [B - (A + C)]': it.difference,
-      'Kết quả đối soát':
-        it.status === 'matched'
-          ? 'Khớp đơn hàng (100%)'
-          : it.status === 'excess'
-            ? `Thừa nhập (+${it.difference})`
-            : `Thiếu nhập (${it.difference})`,
-      'Ghi chú': it.notes || '',
+      'Mã hoa': r.flowerCode,
+      'Tên hoa': r.flowerName,
+      'ĐVT': r.unit,
+      'Tồn đầu (Hôm trước)': r.openingStock,
+      'Xuất ngày (Đơn hàng)': r.dailyExport,
+      'Tồn cuối (Kiểm đếm)': r.closingStock,
+      'Nhập (Tính ra)': r.calculatedImport,
+      'Thực nhập NCC': r.actualImportFromNCC > 0 ? r.actualImportFromNCC : '',
+      'Đối soát với NCC':
+        r.actualImportFromNCC === 0
+          ? ''
+          : r.differenceWithNCC === 0
+            ? 'Khớp 100%'
+            : r.differenceWithNCC > 0
+              ? `Thừa nhập +${r.differenceWithNCC}`
+              : `Thiếu nhập ${r.differenceWithNCC}`,
+      'Ghi chú': r.notes || '',
     }));
 
-    exportRows.push({
+    exportData.push({
       STT: 'TỔNG CỘNG',
-      'Mã hoa': `${filteredItems.length} loại hoa`,
+      'Mã hoa': `${filteredRows.length} loại hoa`,
       'Tên hoa': '',
       'ĐVT': '',
-      'Đơn khách đặt (A)': summary.totalOrders,
-      'Thực nhập NCC (B)': summary.totalImports,
-      'Hoa còn lại kiểm đếm (C)': summary.totalRemaining,
-      'Cần nhập theo đơn (A + C)': summary.totalRequired,
-      'Chênh lệch [B - (A + C)]': summary.netDifference,
-      'Kết quả đối soát':
-        summary.netDifference === 0
-          ? 'Tổng thể khớp đơn'
-          : summary.netDifference > 0
-            ? `Tổng thừa +${summary.netDifference}`
-            : `Tổng thiếu ${summary.netDifference}`,
+      'Tồn đầu (Hôm trước)': summary.opening,
+      'Xuất ngày (Đơn hàng)': summary.export,
+      'Tồn cuối (Kiểm đếm)': summary.closing,
+      'Nhập (Tính ra)': summary.calculatedImport,
+      'Thực nhập NCC': summary.actualNCC > 0 ? summary.actualNCC : '',
+      'Đối soát với NCC':
+        summary.actualNCC === 0
+          ? ''
+          : summary.diffNCC === 0
+            ? 'Khớp hoàn toàn'
+            : summary.diffNCC > 0
+              ? `Tổng thừa +${summary.diffNCC}`
+              : `Tổng thiếu ${summary.diffNCC}`,
       'Ghi chú': '',
     } as any);
 
-    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Doi_Soat_Ton_Ngay');
-    XLSX.writeFile(wb, `Bang_Doi_Soat_Ton_Ngay_${selectedDate}.xlsx`);
-    toast.success('Đã xuất file Excel bảng đối soát tồn ngày thành công');
+    XLSX.utils.book_append_sheet(wb, ws, 'Ton_Ngay');
+    XLSX.writeFile(wb, `Bang_Ton_Ngay_${selectedDate}.xlsx`);
+    toast.success('Đã xuất file Excel bảng tồn ngày thành công');
   };
 
-  // In phiếu đối soát tồn ngày (PDF)
+  // In phiếu kiểm tồn ngày (PDF)
   const handlePrintPdf = () => {
-    if (filteredItems.length === 0) {
-      toast.error('Không có dữ liệu đối soát để in');
+    if (filteredRows.length === 0) {
+      toast.error('Không có dữ liệu để in');
       return;
     }
 
@@ -371,31 +362,19 @@ export default function TonNgayPage() {
     const doc = printFrame.contentWindow?.document;
     if (!doc) return;
 
-    const rowsHtml = filteredItems
-      .map((it, idx) => {
-        const isMatched = it.status === 'matched';
-        const isShortage = it.status === 'shortage';
-        const statusLabel = isMatched
-          ? '<span style="color: #15803d; font-weight: bold;">✔ Khớp đơn</span>'
-          : isShortage
-            ? `<span style="color: #b91c1c; font-weight: bold;">✖ Thiếu nhập (${it.difference})</span>`
-            : `<span style="color: #1d4ed8; font-weight: bold;">▲ Thừa nhập (+${it.difference})</span>`;
-
-        return `
-          <tr>
-            <td style="text-align: center;">${idx + 1}</td>
-            <td style="font-family: monospace; font-weight: bold;">${it.flowerCode}</td>
-            <td style="font-weight: 500;">${it.flowerName}</td>
-            <td style="text-align: right; font-weight: 600;">${formatNumber(it.orderQuantity)}</td>
-            <td style="text-align: right; color: #1d4ed8; font-weight: 600;">${formatNumber(it.importQuantity)}</td>
-            <td style="text-align: right; font-weight: bold; background: #fefce8;">${formatNumber(it.remainingQuantity)}</td>
-            <td style="text-align: right; font-weight: bold; color: ${it.difference === 0 ? '#15803d' : it.difference < 0 ? '#b91c1c' : '#1d4ed8'};">
-              ${it.difference > 0 ? `+${formatNumber(it.difference)}` : formatNumber(it.difference)}
-            </td>
-            <td style="text-align: center;">${statusLabel}</td>
-          </tr>
-        `;
-      })
+    const rowsHtml = filteredRows
+      .map(
+        (r, idx) => `
+        <tr>
+          <td style="text-align: center;">${idx + 1}</td>
+          <td style="font-family: monospace; font-weight: bold;">${r.flowerCode}</td>
+          <td style="font-weight: 500;">${r.flowerName}</td>
+          <td style="text-align: right; color: #4b5563;">${formatNumber(r.openingStock)}</td>
+          <td style="text-align: right; color: #be123c; font-weight: 600;">${formatNumber(r.dailyExport)}</td>
+          <td style="text-align: right; font-weight: bold; background: #fefce8;">${formatNumber(r.closingStock)}</td>
+          <td style="text-align: right; font-weight: bold; color: #1d4ed8; font-size: 13px;">${formatNumber(r.calculatedImport)}</td>
+        </tr>`,
+      )
       .join('');
 
     const htmlContent = `
@@ -403,14 +382,14 @@ export default function TonNgayPage() {
       <html>
       <head>
         <meta charset="utf-8">
-        <title>PHIẾU ĐỐI SOÁT TỒN NGÀY VÀ ĐƠN HÀNG</title>
+        <title>BÁO CÁO TỒN NGÀY VÀ TÍNH SỐ LƯỢNG NHẬP</title>
         <style>
           @page { size: A4; margin: 12mm 10mm; }
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #111827; padding: 15px; margin: 0; font-size: 12px; }
           .header { text-align: center; margin-bottom: 16px; border-bottom: 2px solid #0284c7; padding-bottom: 10px; }
           .header h1 { margin: 0 0 5px; font-size: 18px; text-transform: uppercase; color: #0369a1; }
           .header .subtitle { font-size: 12px; color: #4b5563; }
-          .meta-box { display: flex; justify-content: space-between; margin-bottom: 15px; background: #f0f9ff; padding: 10px 14px; border-radius: 6px; border: 1px solid #bae6fd; font-size: 12px; }
+          .formula { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 8px 12px; border-radius: 6px; font-size: 11px; margin-bottom: 12px; color: #166534; }
           table { width: 100%; border-collapse: collapse; margin-top: 10px; }
           th { background: #f3f4f6; color: #1f2937; border: 1px solid #d1d5db; padding: 7px 6px; font-size: 11px; text-transform: uppercase; }
           td { border: 1px solid #e5e7eb; padding: 6px 7px; font-size: 12px; }
@@ -424,43 +403,34 @@ export default function TonNgayPage() {
       </head>
       <body>
         <div class="header">
-          <h1>PHIẾU ĐỐI SOÁT TỒN NGÀY & ĐƠN HÀNG</h1>
-          <div class="subtitle">HOA KHANG THÀNH • Ngày kiểm tồn: <strong>${formatDate(selectedDate)}</strong></div>
+          <h1>BÁO CÁO TỒN NGÀY & TÍNH SỐ LƯỢNG NHẬP</h1>
+          <div class="subtitle">HOA KHANG THÀNH • Ngày kiểm tra: <strong>${formatDate(selectedDate)}</strong></div>
         </div>
 
-        <div class="meta-box">
-          <div><strong>Tổng đơn khách đặt:</strong> ${formatNumber(summary.totalOrders)} cành/bó</div>
-          <div><strong>Tổng thực nhập NCC:</strong> ${formatNumber(summary.totalImports)} cành/bó</div>
-          <div><strong>Tổng hoa còn lại:</strong> ${formatNumber(summary.totalRemaining)} cành/bó</div>
-          <div><strong>Chênh lệch toàn ngày:</strong> <span style="font-weight: bold; color: ${summary.netDifference === 0 ? '#15803d' : summary.netDifference < 0 ? '#b91c1c' : '#1d4ed8'};">${summary.netDifference > 0 ? `+${formatNumber(summary.netDifference)}` : formatNumber(summary.netDifference)}</span></div>
+        <div class="formula">
+          <strong>Công thức tính:</strong> Nhập = Tồn cuối (kiểm đếm) + Xuất ngày (đơn hàng) - Tồn đầu (tồn cuối hôm trước).
         </div>
 
         <table>
           <thead>
             <tr>
               <th style="width: 40px; text-align: center;">STT</th>
-              <th style="width: 100px; text-align: left;">Mã hoa</th>
+              <th style="width: 110px; text-align: left;">Mã hoa</th>
               <th style="text-align: left;">Tên hoa</th>
-              <th style="width: 85px; text-align: right;">Khách đặt (A)</th>
-              <th style="width: 85px; text-align: right;">Thực nhập (B)</th>
-              <th style="width: 90px; text-align: right;">Còn lại (C)</th>
-              <th style="width: 85px; text-align: right;">Lệch [B-(A+C)]</th>
-              <th style="width: 110px; text-align: center;">Đối soát</th>
+              <th style="width: 100px; text-align: right;">Tồn đầu<br><small style="text-transform: none; color: #6b7280;">(Tồn cuối hôm trước)</small></th>
+              <th style="width: 100px; text-align: right;">Xuất ngày<br><small style="text-transform: none; color: #6b7280;">(Đơn hàng)</small></th>
+              <th style="width: 100px; text-align: right;">Tồn cuối<br><small style="text-transform: none; color: #6b7280;">(Kiểm đếm)</small></th>
+              <th style="width: 110px; text-align: right;">Nhập<br><small style="text-transform: none; color: #1d4ed8;">(Tìm ra nhập)</small></th>
             </tr>
           </thead>
           <tbody>
             ${rowsHtml}
             <tr class="total-row">
-              <td colspan="3" style="text-align: right; padding-right: 10px;">TỔNG CỘNG (${filteredItems.length} LOẠI HOA):</td>
-              <td style="text-align: right;">${formatNumber(summary.totalOrders)}</td>
-              <td style="text-align: right; color: #1d4ed8;">${formatNumber(summary.totalImports)}</td>
-              <td style="text-align: right;">${formatNumber(summary.totalRemaining)}</td>
-              <td style="text-align: right; color: ${summary.netDifference === 0 ? '#15803d' : summary.netDifference < 0 ? '#b91c1c' : '#1d4ed8'};">
-                ${summary.netDifference > 0 ? `+${formatNumber(summary.netDifference)}` : formatNumber(summary.netDifference)}
-              </td>
-              <td style="text-align: center; font-size: 11px;">
-                ${summary.netDifference === 0 ? '✔ Khớp hoàn toàn' : summary.netDifference < 0 ? '✖ Thiếu nhập' : '▲ Thừa nhập'}
-              </td>
+              <td colspan="3" style="text-align: right; padding-right: 10px;">TỔNG CỘNG (${filteredRows.length} LOẠI HOA):</td>
+              <td style="text-align: right;">${formatNumber(summary.opening)}</td>
+              <td style="text-align: right; color: #be123c;">${formatNumber(summary.export)}</td>
+              <td style="text-align: right;">${formatNumber(summary.closing)}</td>
+              <td style="text-align: right; color: #1d4ed8; font-weight: bold;">${formatNumber(summary.calculatedImport)}</td>
             </tr>
           </tbody>
         </table>
@@ -471,11 +441,11 @@ export default function TonNgayPage() {
             <div>(Ký & ghi rõ họ tên)</div>
           </div>
           <div class="sign-col">
-            <div class="sign-title">Thủ kho soạn đơn</div>
+            <div class="sign-title">Thủ kho</div>
             <div>(Ký & ghi rõ họ tên)</div>
           </div>
           <div class="sign-col">
-            <div class="sign-title">Chủ shop / Kế toán</div>
+            <div class="sign-title">Kế toán / Chủ shop</div>
             <div>(Ký & ghi rõ họ tên)</div>
           </div>
         </div>
@@ -506,10 +476,10 @@ export default function TonNgayPage() {
           </div>
           <div>
             <h1 className="text-base sm:text-lg font-bold text-foreground">
-              Kiểm Tồn Ngày & Đối Soát Đơn Hàng
+              Báo Cáo Tồn Ngày & Tính Số Lượng Nhập
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Nhập số lượng hoa còn lại để hệ thống tự động kiểm tra số lượng thực nhập từ NCC có khớp với đơn hàng khách đặt hay không
+              Tồn đầu lấy từ Tồn cuối hôm trước • Xuất ngày lấy từ Đơn hàng • Nhập số Tồn cuối để tìm ra số lượng Nhập
             </p>
           </div>
         </div>
@@ -559,122 +529,87 @@ export default function TonNgayPage() {
 
       {/* Thẻ thống kê KPI tổng quan */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 shrink-0">
-        {/* Khách đặt */}
-        <div className="p-3 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20 shadow-sm flex items-center justify-between">
-          <div>
-            <div className="text-xs text-blue-800 dark:text-blue-300 font-medium flex items-center gap-1">
-              <ShoppingCart size={13} /> Đơn khách đặt (A)
-            </div>
-            <div className="text-lg font-extrabold text-blue-700 dark:text-blue-300 mt-0.5 tabular-nums">
-              {formatNumber(summary.totalOrders)}
-            </div>
-          </div>
-        </div>
-
-        {/* Thực nhập NCC */}
-        <div className="p-3 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/20 shadow-sm flex items-center justify-between">
-          <div>
-            <div className="text-xs text-indigo-800 dark:text-indigo-300 font-medium flex items-center gap-1">
-              <Truck size={13} /> Thực nhập NCC (B)
-            </div>
-            <div className="text-lg font-extrabold text-indigo-700 dark:text-indigo-300 mt-0.5 tabular-nums">
-              {formatNumber(summary.totalImports)}
-            </div>
-          </div>
-        </div>
-
-        {/* Hoa còn lại kiểm đếm */}
-        <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20 shadow-sm flex items-center justify-between">
-          <div>
-            <div className="text-xs text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1">
-              <Package size={13} /> Hoa còn lại (C)
-            </div>
-            <div className="text-lg font-extrabold text-amber-700 dark:text-amber-300 mt-0.5 tabular-nums">
-              {formatNumber(summary.totalRemaining)}
-            </div>
-          </div>
-        </div>
-
-        {/* Cần nhập theo đơn */}
+        {/* Tổng loại hoa */}
         <div className="p-3 rounded-xl border border-border bg-card shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-              <ClipboardCheck size={13} /> Cần nhập (A + C)
-            </div>
+            <div className="text-xs text-muted-foreground">Mặt hàng kiểm tra</div>
             <div className="text-lg font-bold text-foreground mt-0.5 tabular-nums">
-              {formatNumber(summary.totalRequired)}
+              {filteredRows.length} loại
             </div>
+          </div>
+          <div className="p-2 rounded-lg bg-primary/10 text-primary">
+            <Package size={18} />
           </div>
         </div>
 
-        {/* Kết quả đối soát tổng */}
-        <div
-          className={`p-3 rounded-xl border shadow-sm flex items-center justify-between ${
-            summary.netDifference === 0
-              ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/20'
-              : summary.netDifference < 0
-                ? 'border-rose-200 dark:border-rose-800 bg-rose-50/60 dark:bg-rose-950/20'
-                : 'border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/20'
-          }`}
-        >
+        {/* Tổng Tồn đầu */}
+        <div className="p-3 rounded-xl border border-border bg-card shadow-sm flex items-center justify-between">
           <div>
-            <div
-              className={`text-xs font-semibold ${
-                summary.netDifference === 0
-                  ? 'text-emerald-800 dark:text-emerald-300'
-                  : summary.netDifference < 0
-                    ? 'text-rose-800 dark:text-rose-300'
-                    : 'text-blue-800 dark:text-blue-300'
-              }`}
-            >
-              {summary.netDifference === 0
-                ? '✔ Khớp đơn 100%'
-                : summary.netDifference < 0
-                  ? '❌ Thiếu nhập'
-                  : '▲ Thừa nhập'}
-            </div>
-            <div
-              className={`text-lg font-extrabold mt-0.5 tabular-nums ${
-                summary.netDifference === 0
-                  ? 'text-emerald-700 dark:text-emerald-300'
-                  : summary.netDifference < 0
-                    ? 'text-rose-700 dark:text-rose-300'
-                    : 'text-blue-700 dark:text-blue-300'
-              }`}
-            >
-              {summary.netDifference > 0 ? `+${formatNumber(summary.netDifference)}` : formatNumber(summary.netDifference)}
+            <div className="text-xs text-muted-foreground">Tồn đầu (Hôm trước)</div>
+            <div className="text-lg font-bold text-foreground mt-0.5 tabular-nums">
+              {formatNumber(summary.opening)}
             </div>
           </div>
-          <div className="text-right text-[11px] text-muted-foreground space-y-0.5">
-            <span className="text-emerald-600 font-bold">{summary.matchedCount} khớp</span> •{' '}
-            <span className="text-rose-600 font-bold">{summary.shortageCount} thiếu</span> •{' '}
-            <span className="text-blue-600 font-bold">{summary.excessCount} thừa</span>
+          <div className="p-2 rounded-lg bg-muted text-muted-foreground">
+            <RotateCcw size={18} />
+          </div>
+        </div>
+
+        {/* Tổng Xuất ngày */}
+        <div className="p-3 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50/50 dark:bg-rose-950/20 shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-xs text-rose-800 dark:text-rose-300 font-medium">Xuất ngày (Đơn bán)</div>
+            <div className="text-lg font-extrabold text-rose-700 dark:text-rose-300 mt-0.5 tabular-nums">
+              {formatNumber(summary.export)}
+            </div>
+          </div>
+          <div className="p-2 rounded-lg bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300">
+            <ShoppingCart size={18} />
+          </div>
+        </div>
+
+        {/* Tổng Tồn cuối */}
+        <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20 shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-xs text-amber-800 dark:text-amber-300 font-medium">Tồn cuối (Đã đếm)</div>
+            <div className="text-lg font-extrabold text-amber-700 dark:text-amber-300 mt-0.5 tabular-nums">
+              {formatNumber(summary.closing)}
+            </div>
+          </div>
+          <div className="p-2 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
+            <ClipboardCheck size={18} />
+          </div>
+        </div>
+
+        {/* Tổng Nhập tìm ra */}
+        <div className="p-3 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/20 shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-xs text-blue-800 dark:text-blue-300 font-semibold">Nhập (Tìm ra)</div>
+            <div className="text-lg font-extrabold text-blue-700 dark:text-blue-300 mt-0.5 tabular-nums">
+              {formatNumber(summary.calculatedImport)}
+            </div>
+          </div>
+          <div className="p-2 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
+            <TrendingUp size={18} />
           </div>
         </div>
       </div>
 
-      {/* Hướng dẫn công thức ngắn gọn */}
-      <div className="px-3 py-2 rounded-lg bg-muted/50 border border-border/80 flex items-center justify-between text-xs text-muted-foreground shrink-0 flex-wrap gap-2">
+      {/* Dòng hướng dẫn công thức */}
+      <div className="px-3.5 py-2 rounded-lg bg-cyan-50/60 dark:bg-cyan-950/20 border border-cyan-200 dark:border-cyan-800 flex items-center justify-between text-xs text-cyan-900 dark:text-cyan-200 shrink-0 flex-wrap gap-2">
         <div className="flex items-center gap-1.5">
           <Info size={14} className="text-cyan-600 shrink-0" />
           <span>
-            <strong>Công thức kiểm tra:</strong> Chênh lệch = Thực nhập NCC (B) - [Đơn khách đặt (A) + Hoa còn lại (C)].
+            <strong>Quy tắc tính toán:</strong> Nhập = Tồn cuối + Xuất ngày - Tồn đầu.
+            (Tồn đầu hôm nay tự động nhận từ Tồn cuối hôm qua).
           </span>
         </div>
-        <div className="flex items-center gap-3 text-[11px]">
-          <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
-            <CheckCircle2 size={12} /> Bằng 0: Nhập đúng theo đơn hàng
-          </span>
-          <span className="inline-flex items-center gap-1 text-blue-600 font-semibold">
-            <TrendingUp size={12} /> Dương (+): Thừa nhập / Dư hoa
-          </span>
-          <span className="inline-flex items-center gap-1 text-rose-600 font-semibold">
-            <TrendingDown size={12} /> Âm (-): Nhập thiếu so với đơn
-          </span>
+        <div className="text-[11px] text-muted-foreground">
+          Bấm vào ô <strong>Tồn cuối</strong> để nhập số lượng hoa kiểm đếm thực tế
         </div>
       </div>
 
-      {/* Thanh công cụ: Tìm kiếm, lọc trạng thái & các nút thao tác */}
+      {/* Thanh công cụ: Tìm kiếm & Nút thao tác */}
       <div className="p-3 rounded-xl border border-border bg-card shadow-sm flex flex-wrap items-center justify-between gap-2.5 shrink-0">
         <div className="flex items-center gap-2 flex-1 min-w-[220px] max-w-sm">
           <div className="relative w-full">
@@ -689,89 +624,7 @@ export default function TonNgayPage() {
           </div>
         </div>
 
-        {/* Nút lọc trạng thái */}
-        <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border/60 text-xs">
-          <button
-            type="button"
-            onClick={() => setFilterStatus('all')}
-            className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-              filterStatus === 'all'
-                ? 'bg-background text-foreground shadow-xs font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Tất cả ({reconcileItems.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilterStatus('matched')}
-            className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-              filterStatus === 'matched'
-                ? 'bg-background text-emerald-600 shadow-xs font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Khớp đơn
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilterStatus('mismatched')}
-            className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-              filterStatus === 'mismatched'
-                ? 'bg-background text-amber-600 shadow-xs font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Có lệch
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilterStatus('shortage')}
-            className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-              filterStatus === 'shortage'
-                ? 'bg-background text-rose-600 shadow-xs font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Thiếu nhập
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilterStatus('excess')}
-            className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-              filterStatus === 'excess'
-                ? 'bg-background text-blue-600 shadow-xs font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Thừa nhập
-          </button>
-        </div>
-
-        {/* Nút thao tác nhanh */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleAutoFillTheoretical}
-            className="h-8 gap-1 text-xs text-foreground border-border hover:bg-muted"
-            title="Tự động tính hoa còn lại = max(0, Nhập - Đơn)"
-          >
-            <Wand2 size={13} className="text-cyan-600" />
-            <span>Điền theo lý thuyết</span>
-          </Button>
-
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleResetToZero}
-            className="h-8 gap-1 text-xs text-muted-foreground border-border hover:bg-muted"
-            title="Đặt lại toàn bộ hoa còn lại về 0 để kiểm đếm lại từ đầu"
-          >
-            <RotateCcw size={13} />
-            <span>Về 0</span>
-          </Button>
-
           <Button
             size="sm"
             variant="outline"
@@ -789,7 +642,7 @@ export default function TonNgayPage() {
             className="h-8 gap-1 text-xs text-foreground border-border hover:bg-muted"
           >
             <Printer size={13} />
-            <span>In phiếu</span>
+            <span>In PDF</span>
           </Button>
 
           <Button
@@ -804,7 +657,7 @@ export default function TonNgayPage() {
         </div>
       </div>
 
-      {/* Bảng đối soát tồn ngày */}
+      {/* Bảng dữ liệu: Mã hoa, Tên hoa, Tồn đầu, Xuất ngày, Tồn cuối, Nhập */}
       <div className="flex-1 min-h-0 bg-card rounded-xl border border-border overflow-hidden shadow-sm flex flex-col">
         <div className="flex-1 overflow-auto custom-scrollbar">
           <table className="w-full text-xs text-left border-separate border-spacing-0">
@@ -812,40 +665,43 @@ export default function TonNgayPage() {
               <tr>
                 <th className="px-3 py-2.5 text-center border-b border-r border-border w-12 bg-muted">STT</th>
                 <th className="px-3 py-2.5 border-b border-r border-border w-28 bg-muted">Mã hoa</th>
-                <th className="px-3 py-2.5 border-b border-r border-border min-w-[180px] bg-muted">Tên hoa</th>
-                <th className="px-3 py-2.5 text-right border-b border-r border-border w-28 text-blue-700 dark:text-blue-400 bg-muted">
-                  Khách đặt (A)
+                <th className="px-3 py-2.5 border-b border-r border-border min-w-[200px] bg-muted">Tên hoa</th>
+                <th className="px-3 py-2.5 text-right border-b border-r border-border w-32 bg-muted">
+                  Tồn đầu
+                  <div className="text-[10px] font-normal text-muted-foreground">(Tồn cuối hôm trước)</div>
                 </th>
-                <th className="px-3 py-2.5 text-right border-b border-r border-border w-28 text-indigo-700 dark:text-indigo-400 bg-muted">
-                  Thực nhập (B)
+                <th className="px-3 py-2.5 text-right border-b border-r border-border w-32 text-rose-700 dark:text-rose-400 bg-muted">
+                  Xuất ngày
+                  <div className="text-[10px] font-normal text-muted-foreground">(Từ đơn hàng)</div>
                 </th>
                 <th className="px-3 py-2.5 text-center border-b border-r border-border w-36 bg-amber-50/80 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200">
-                  Hoa còn lại (C)
+                  Tồn cuối
+                  <div className="text-[10px] font-normal text-amber-700 dark:text-amber-300">(Tôi nhập vào ô này)</div>
+                </th>
+                <th className="px-3 py-2.5 text-right border-b border-r border-border w-32 text-blue-700 dark:text-blue-400 bg-muted font-bold">
+                  Nhập
+                  <div className="text-[10px] font-normal text-blue-600 dark:text-blue-400">(Tìm ra nhập)</div>
                 </th>
                 <th className="px-3 py-2.5 text-right border-b border-r border-border w-28 bg-muted">
-                  Cần nhập (A+C)
+                  Thực nhập NCC
                 </th>
-                <th className="px-3 py-2.5 text-right border-b border-r border-border w-28 bg-muted">
-                  Lệch [B-(A+C)]
+                <th className="px-3 py-2.5 text-center border-b border-border w-36 bg-muted">
+                  Đối soát NCC
                 </th>
-                <th className="px-3 py-2.5 text-center border-b border-r border-border w-36 bg-muted">
-                  Kết quả đối soát
-                </th>
-                <th className="px-3 py-2.5 border-b border-border min-w-[140px] bg-muted">Ghi chú đối soát</th>
               </tr>
             </thead>
             <tbody>
-              {filteredItems.length === 0 ? (
+              {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-16 text-center text-muted-foreground bg-card">
-                    Không có mặt hàng hoa nào phù hợp trong ngày {formatDate(selectedDate)}
+                  <td colSpan={9} className="py-16 text-center text-muted-foreground bg-card">
+                    Không có mặt hàng hoa nào phát sinh trong ngày {formatDate(selectedDate)}
                   </td>
                 </tr>
               ) : (
-                filteredItems.map((item, index) => {
-                  const isMatched = item.status === 'matched';
-                  const isShortage = item.status === 'shortage';
-                  const requiredQty = item.orderQuantity + item.remainingQuantity - item.openingStock;
+                filteredRows.map((item, index) => {
+                  const hasNCC = item.actualImportFromNCC > 0;
+                  const isNCCMatched = item.differenceWithNCC === 0;
+                  const isNCCShortage = item.differenceWithNCC < 0;
 
                   return (
                     <tr
@@ -869,141 +725,122 @@ export default function TonNgayPage() {
                         <div>{item.flowerName}</div>
                       </td>
 
-                      {/* Đơn khách đặt (A) */}
-                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-blue-600 dark:text-blue-400 border-r border-border/60">
-                        {formatNumber(item.orderQuantity)}
+                      {/* Tồn đầu (Tồn cuối hôm trước) */}
+                      <td className="px-3 py-2 text-right tabular-nums border-r border-border/60">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditOpening(item)}
+                          title="Bấm để chỉnh sửa nếu chưa có tồn cuối hôm trước"
+                          className="font-semibold text-foreground hover:text-primary hover:underline transition-colors"
+                        >
+                          {formatNumber(item.openingStock)}
+                        </button>
                       </td>
 
-                      {/* Thực nhập NCC (B) */}
-                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-indigo-600 dark:text-indigo-400 border-r border-border/60">
-                        {formatNumber(item.importQuantity)}
+                      {/* Xuất ngày (Từ đơn hàng) */}
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-rose-600 dark:text-rose-400 border-r border-border/60">
+                        {item.dailyExport > 0 ? `-${formatNumber(item.dailyExport)}` : '0'}
                       </td>
 
-                      {/* Hoa còn lại (C) - Ô INPUT trực tiếp để người dùng nhập kiểm đếm */}
+                      {/* Tồn cuối (Tôi nhập tồn cuối) - Ô nhập liệu trực tiếp */}
                       <td className="px-2 py-1.5 border-r border-border/60 bg-amber-50/30 dark:bg-amber-950/20 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button
                             type="button"
-                            onClick={() => handleRemainingChange(item, item.remainingQuantity - 5)}
+                            onClick={() => handleClosingStockChange(item, item.closingStock - 5)}
                             className="w-5 h-6 rounded bg-muted hover:bg-muted/80 text-muted-foreground text-xs flex items-center justify-center font-bold"
-                            title="-5 cành"
+                            title="-5"
                           >
                             -
                           </button>
                           <input
                             type="number"
                             min="0"
-                            value={item.remainingQuantity === 0 ? '' : item.remainingQuantity}
+                            value={item.closingStock === 0 ? '' : item.closingStock}
                             placeholder="0"
                             onChange={(e) =>
-                              handleRemainingChange(item, Number(e.target.value) || 0)
+                              handleClosingStockChange(item, Number(e.target.value) || 0)
                             }
                             className="w-20 h-7 text-center font-bold text-xs rounded border border-amber-300 dark:border-amber-700 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                           />
                           <button
                             type="button"
-                            onClick={() => handleRemainingChange(item, item.remainingQuantity + 5)}
+                            onClick={() => handleClosingStockChange(item, item.closingStock + 5)}
                             className="w-5 h-6 rounded bg-muted hover:bg-muted/80 text-muted-foreground text-xs flex items-center justify-center font-bold"
-                            title="+5 cành"
+                            title="+5"
                           >
                             +
                           </button>
                         </div>
                       </td>
 
-                      {/* Cần nhập theo đơn (A + C) */}
+                      {/* Nhập (Tìm ra nhập = Tồn cuối + Xuất ngày - Tồn đầu) */}
+                      <td className="px-3 py-2 text-right tabular-nums font-extrabold text-blue-600 dark:text-blue-400 border-r border-border/60 bg-blue-50/20 dark:bg-blue-950/10">
+                        {formatNumber(item.calculatedImport)}
+                      </td>
+
+                      {/* Thực nhập NCC */}
                       <td className="px-3 py-2 text-right tabular-nums font-semibold text-foreground border-r border-border/60">
-                        {formatNumber(requiredQty)}
+                        {hasNCC ? formatNumber(item.actualImportFromNCC) : <span className="text-muted-foreground">—</span>}
                       </td>
 
-                      {/* Lệch [B - (A + C)] */}
-                      <td className="px-3 py-2 text-right tabular-nums font-bold border-r border-border/60">
-                        <span
-                          className={
-                            isMatched
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : isShortage
-                                ? 'text-rose-600 dark:text-rose-400'
-                                : 'text-blue-600 dark:text-blue-400'
-                          }
-                        >
-                          {item.difference > 0 ? `+${formatNumber(item.difference)}` : formatNumber(item.difference)}
-                        </span>
-                      </td>
-
-                      {/* Kết quả đối soát */}
-                      <td className="px-3 py-2 text-center border-r border-border/60">
-                        {isMatched ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200">
+                      {/* Đối soát với NCC */}
+                      <td className="px-3 py-2 text-center">
+                        {!hasNCC ? (
+                          <span className="text-muted-foreground text-[11px]">Chưa nhập NCC</span>
+                        ) : isNCCMatched ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200">
                             <CheckCircle2 size={12} /> Khớp đơn
                           </span>
-                        ) : isShortage ? (
+                        ) : isNCCShortage ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200">
-                            <AlertTriangle size={12} /> Thiếu {formatNumber(Math.abs(item.difference))}
+                            <TrendingDown size={12} /> Thiếu {formatNumber(Math.abs(item.differenceWithNCC))}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200">
-                            <TrendingUp size={12} /> Thừa +{formatNumber(item.difference)}
+                            <TrendingUp size={12} /> Thừa +{formatNumber(item.differenceWithNCC)}
                           </span>
                         )}
-                      </td>
-
-                      {/* Ghi chú đối soát */}
-                      <td className="px-2 py-1.5">
-                        <input
-                          type="text"
-                          placeholder="Ghi chú đối soát..."
-                          value={item.notes || ''}
-                          onChange={(e) => setNotes(selectedDate, item.flowerId, e.target.value)}
-                          className="w-full h-7 px-2 text-xs rounded border border-transparent hover:border-border focus:border-primary bg-transparent focus:bg-background focus:outline-none"
-                        />
                       </td>
                     </tr>
                   );
                 })
               )}
             </tbody>
-            {/* Dòng TỔNG CỘNG ở chân bảng */}
-            {filteredItems.length > 0 && (
+            {/* Dòng TỔNG CỘNG */}
+            {filteredRows.length > 0 && (
               <tfoot className="sticky bottom-0 z-10 bg-muted/95 border-t-2 border-border shadow-xs font-bold text-xs">
                 <tr>
                   <td colSpan={3} className="px-3 py-2.5 text-right uppercase border-r border-border">
-                    TỔNG CỘNG ({filteredItems.length} LOẠI HOA):
+                    TỔNG CỘNG ({filteredRows.length} LOẠI HOA):
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-blue-700 dark:text-blue-300 border-r border-border font-extrabold">
-                    {formatNumber(summary.totalOrders)}
+                  <td className="px-3 py-2.5 text-right tabular-nums text-foreground border-r border-border font-bold">
+                    {formatNumber(summary.opening)}
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-indigo-700 dark:text-indigo-300 border-r border-border font-extrabold">
-                    {formatNumber(summary.totalImports)}
+                  <td className="px-3 py-2.5 text-right tabular-nums text-rose-700 dark:text-rose-400 border-r border-border font-bold">
+                    {formatNumber(summary.export)}
                   </td>
                   <td className="px-3 py-2.5 text-center tabular-nums text-amber-800 dark:text-amber-200 border-r border-border font-extrabold bg-amber-100/60 dark:bg-amber-950/60">
-                    {formatNumber(summary.totalRemaining)}
+                    {formatNumber(summary.closing)}
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-foreground border-r border-border font-extrabold">
-                    {formatNumber(summary.totalRequired)}
+                  <td className="px-3 py-2.5 text-right tabular-nums text-blue-700 dark:text-blue-300 border-r border-border font-extrabold bg-blue-50/40 dark:bg-blue-950/30">
+                    {formatNumber(summary.calculatedImport)}
                   </td>
-                  <td
-                    className={`px-3 py-2.5 text-right tabular-nums border-r border-border font-extrabold ${
-                      summary.netDifference === 0
-                        ? 'text-emerald-700 dark:text-emerald-300'
-                        : summary.netDifference < 0
-                          ? 'text-rose-700 dark:text-rose-300'
-                          : 'text-blue-700 dark:text-blue-300'
-                    }`}
-                  >
-                    {summary.netDifference > 0 ? `+${formatNumber(summary.netDifference)}` : formatNumber(summary.netDifference)}
+                  <td className="px-3 py-2.5 text-right tabular-nums text-foreground border-r border-border font-bold">
+                    {summary.actualNCC > 0 ? formatNumber(summary.actualNCC) : '—'}
                   </td>
-                  <td className="px-3 py-2.5 text-center border-r border-border">
-                    {summary.netDifference === 0 ? (
-                      <span className="text-emerald-700 dark:text-emerald-300 font-extrabold">✔ Khớp 100%</span>
-                    ) : summary.netDifference < 0 ? (
-                      <span className="text-rose-700 dark:text-rose-300 font-extrabold">Thiếu {formatNumber(Math.abs(summary.netDifference))}</span>
+                  <td className="px-3 py-2.5 text-center text-muted-foreground text-[11px] font-normal">
+                    {summary.actualNCC > 0 ? (
+                      summary.diffNCC === 0 ? (
+                        <span className="text-emerald-600 font-bold">✔ Khớp hoàn toàn</span>
+                      ) : summary.diffNCC > 0 ? (
+                        <span className="text-blue-600 font-bold">Thừa +{formatNumber(summary.diffNCC)}</span>
+                      ) : (
+                        <span className="text-rose-600 font-bold">Thiếu {formatNumber(Math.abs(summary.diffNCC))}</span>
+                      )
                     ) : (
-                      <span className="text-blue-700 dark:text-blue-300 font-extrabold">Thừa +{formatNumber(summary.netDifference)}</span>
+                      '—'
                     )}
-                  </td>
-                  <td className="px-3 py-2.5 text-muted-foreground text-[11px] font-normal">
-                    {summary.matchedCount}/{filteredItems.length} loại hoa khớp đơn
                   </td>
                 </tr>
               </tfoot>
@@ -1011,6 +848,57 @@ export default function TonNgayPage() {
           </table>
         </div>
       </div>
+
+      {/* Modal điều chỉnh Tồn đầu thủ công */}
+      {editingOpeningItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-card border border-border rounded-xl shadow-xl w-full max-w-sm p-4 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-border pb-2.5">
+              <div>
+                <h3 className="text-sm font-bold text-foreground">Điều chỉnh Tồn đầu ngày</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {editingOpeningItem.flowerCode} • {editingOpeningItem.flowerName}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingOpeningItem(null)}
+                className="text-muted-foreground hover:text-foreground text-xs p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-semibold text-foreground block mb-1">
+                  Số lượng Tồn đầu ({editingOpeningItem.unit}):
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editingOpeningVal}
+                  onChange={(e) => setEditingOpeningVal(Number(e.target.value) || 0)}
+                  className="w-full h-9 px-3 text-sm font-semibold rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  autoFocus
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  (Thông thường hệ thống tự động lấy từ Tồn cuối hôm trước. Bạn chỉ chỉnh khi ngày đầu tiên chưa có số liệu).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditingOpeningItem(null)}>
+                Hủy
+              </Button>
+              <Button type="button" size="sm" onClick={handleSaveOpeningStock} className="bg-primary text-primary-foreground font-semibold">
+                Lưu tồn đầu
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal thêm hoa vào bảng kiểm tồn */}
       {isAddFlowerModalOpen && (

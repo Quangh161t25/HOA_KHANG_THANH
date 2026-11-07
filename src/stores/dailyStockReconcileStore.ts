@@ -1,50 +1,86 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export interface DailyReconcileItem {
+export interface DailyStockItem {
   id: string; // date_flowerId
   date: string; // YYYY-MM-DD
   flowerId: string;
   flowerCode: string;
   flowerName: string;
   unit: string;
-  openingStock: number; // Tồn đầu ngày
-  orderQuantity: number; // Tổng khách đặt trong ngày
-  importQuantity: number; // Tổng thực tế nhập từ NCC trong ngày
-  remainingQuantity: number; // Số lượng hoa còn lại (Người dùng nhập vào để kiểm đếm)
-  difference: number; // Chênh lệch = (Tồn đầu + Nhập) - (Đơn hàng + Hoa còn lại)
-  status: 'matched' | 'excess' | 'shortage'; // matched: Khớp đơn, excess: Thừa nhập (+), shortage: Thiếu nhập (-)
+  openingStock: number; // Tồn đầu (lấy từ Tồn cuối hôm trước)
+  dailyExport: number; // Xuất ngày (lấy từ đơn hàng theo ngày)
+  closingStock: number; // Tồn cuối (người dùng nhập vào)
+  calculatedImport: number; // Nhập = Tồn cuối + Xuất ngày - Tồn đầu
+  actualImportFromNCC: number; // Thực tế nhập từ NCC trong ngày (nếu có đơn nhập)
   notes?: string;
+  isOpeningCustom?: boolean; // Người dùng tự sửa tồn đầu thủ công
 }
 
 interface DailyStockReconcileState {
-  records: Record<string, DailyReconcileItem[]>; // Key là ngày YYYY-MM-DD
-  setRemainingQuantity: (
+  records: Record<string, DailyStockItem[]>; // Key là ngày YYYY-MM-DD
+
+  // Cập nhật số lượng Tồn cuối (người dùng nhập vào ô tồn cuối)
+  setClosingStock: (
     date: string,
     flowerId: string,
-    quantity: number,
-    flowerInfo?: { flowerCode?: string; flowerName?: string; unit?: string; orderQuantity?: number; importQuantity?: number; openingStock?: number },
+    closingStock: number,
+    flowerInfo?: {
+      flowerCode?: string;
+      flowerName?: string;
+      unit?: string;
+      dailyExport?: number;
+      openingStock?: number;
+      actualImportFromNCC?: number;
+    },
   ) => void;
-  setOpeningStock: (date: string, flowerId: string, opening: number) => void;
+
+  // Điều chỉnh tồn đầu thủ công (nếu ngày đầu tiên chưa có tồn cuối hôm trước)
+  setOpeningStock: (date: string, flowerId: string, openingStock: number) => void;
+
   setNotes: (date: string, flowerId: string, notes: string) => void;
-  saveDailyItems: (date: string, items: DailyReconcileItem[]) => void;
+  saveDailyItems: (date: string, items: DailyStockItem[]) => void;
   deleteItem: (date: string, flowerId: string) => void;
   clearDate: (date: string) => void;
 }
 
-export function computeReconcileStatus(opening: number, imported: number, ordered: number, remaining: number): {
-  difference: number;
-  status: 'matched' | 'excess' | 'shortage';
-} {
-  // Lượng hoa cung ứng (Tồn đầu + Nhập) so với Lượng hoa phân bổ (Đơn hàng giao khách + Hoa còn lại trong kho)
-  const difference = (opening + imported) - (ordered + remaining);
-  if (difference === 0) {
-    return { difference: 0, status: 'matched' };
-  } else if (difference > 0) {
-    return { difference, status: 'excess' }; // Thừa nhập / Dư hoa
-  } else {
-    return { difference, status: 'shortage' }; // Thiếu nhập / Thiếu hoa giao đơn
+// Tìm Tồn cuối của ngày hôm trước (hoặc ngày gần nhất trước ngày hiện tại)
+export function getPreviousClosingStock(
+  records: Record<string, DailyStockItem[]>,
+  currentDate: string,
+  flowerId: string,
+): number | undefined {
+  // 1. Kiểm tra ngày hôm qua chính xác (D - 1)
+  const prevDate = new Date(currentDate);
+  prevDate.setDate(prevDate.getDate() - 1);
+  const prevDateStr = prevDate.toISOString().split('T')[0];
+
+  const yesterdayItems = records[prevDateStr];
+  if (yesterdayItems && yesterdayItems.length > 0) {
+    const it = yesterdayItems.find(
+      (i) => i.flowerId === flowerId || (i.flowerCode && i.flowerCode.toLowerCase() === flowerId.toLowerCase()),
+    );
+    if (it && it.closingStock !== undefined && it.closingStock !== null) {
+      return it.closingStock;
+    }
   }
+
+  // 2. Tìm ngày ghi nhận gần nhất trước ngày hiện tại (nếu có ngày nghỉ/cuối tuần)
+  const pastDates = Object.keys(records)
+    .filter((d) => d < currentDate)
+    .sort((a, b) => b.localeCompare(a));
+
+  for (const d of pastDates) {
+    const items = records[d];
+    const it = items?.find(
+      (i) => i.flowerId === flowerId || (i.flowerCode && i.flowerCode.toLowerCase() === flowerId.toLowerCase()),
+    );
+    if (it && it.closingStock !== undefined && it.closingStock !== null) {
+      return it.closingStock;
+    }
+  }
+
+  return undefined;
 }
 
 export const useDailyStockReconcileStore = create<DailyStockReconcileState>()(
@@ -52,34 +88,36 @@ export const useDailyStockReconcileStore = create<DailyStockReconcileState>()(
     (set) => ({
       records: {},
 
-      setRemainingQuantity: (date, flowerId, quantity, flowerInfo) =>
+      setClosingStock: (date, flowerId, closingStock, flowerInfo) =>
         set((state) => {
           const dayItems = state.records[date] || [];
           const existingIndex = dayItems.findIndex((it) => it.flowerId === flowerId);
 
-          let updatedItems: DailyReconcileItem[];
+          const closing = Math.max(0, closingStock || 0);
+
+          let updatedItems: DailyStockItem[];
           if (existingIndex >= 0) {
             const current = dayItems[existingIndex];
-            const { difference, status } = computeReconcileStatus(
-              current.openingStock || 0,
-              current.importQuantity || 0,
-              current.orderQuantity || 0,
-              quantity,
-            );
-            const updated = {
+            const opening = current.openingStock || 0;
+            const exportQty = current.dailyExport || 0;
+            const calcImport = Math.max(0, closing + exportQty - opening);
+
+            const updated: DailyStockItem = {
               ...current,
-              remainingQuantity: quantity,
-              difference,
-              status,
+              closingStock: closing,
+              calculatedImport: calcImport,
             };
             updatedItems = [...dayItems];
             updatedItems[existingIndex] = updated;
           } else {
-            const opening = flowerInfo?.openingStock || 0;
-            const imported = flowerInfo?.importQuantity || 0;
-            const ordered = flowerInfo?.orderQuantity || 0;
-            const { difference, status } = computeReconcileStatus(opening, imported, ordered, quantity);
-            const newItem: DailyReconcileItem = {
+            const opening =
+              flowerInfo?.openingStock ??
+              getPreviousClosingStock(state.records, date, flowerId) ??
+              0;
+            const exportQty = flowerInfo?.dailyExport || 0;
+            const calcImport = Math.max(0, closing + exportQty - opening);
+
+            const newItem: DailyStockItem = {
               id: `${date}_${flowerId}`,
               date,
               flowerId,
@@ -87,11 +125,10 @@ export const useDailyStockReconcileStore = create<DailyStockReconcileState>()(
               flowerName: flowerInfo?.flowerName || '',
               unit: flowerInfo?.unit || 'cành',
               openingStock: opening,
-              orderQuantity: ordered,
-              importQuantity: imported,
-              remainingQuantity: quantity,
-              difference,
-              status,
+              dailyExport: exportQty,
+              closingStock: closing,
+              calculatedImport: calcImport,
+              actualImportFromNCC: flowerInfo?.actualImportFromNCC || 0,
             };
             updatedItems = [...dayItems, newItem];
           }
@@ -104,25 +141,21 @@ export const useDailyStockReconcileStore = create<DailyStockReconcileState>()(
           };
         }),
 
-      setOpeningStock: (date, flowerId, opening) =>
+      setOpeningStock: (date, flowerId, openingStock) =>
         set((state) => {
           const dayItems = state.records[date] || [];
           const existingIndex = dayItems.findIndex((it) => it.flowerId === flowerId);
           if (existingIndex < 0) return state;
 
           const current = dayItems[existingIndex];
-          const { difference, status } = computeReconcileStatus(
-            opening,
-            current.importQuantity || 0,
-            current.orderQuantity || 0,
-            current.remainingQuantity || 0,
-          );
+          const opening = Math.max(0, openingStock || 0);
+          const calcImport = Math.max(0, current.closingStock + current.dailyExport - opening);
 
-          const updated = {
+          const updated: DailyStockItem = {
             ...current,
             openingStock: opening,
-            difference,
-            status,
+            calculatedImport: calcImport,
+            isOpeningCustom: true,
           };
           const updatedItems = [...dayItems];
           updatedItems[existingIndex] = updated;
