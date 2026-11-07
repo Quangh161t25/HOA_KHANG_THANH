@@ -8,21 +8,21 @@ export interface DailyStockItem {
   flowerCode: string;
   flowerName: string;
   unit: string;
-  openingStock: number; // Tồn đầu (lấy từ Tồn cuối hôm trước)
-  dailyExport: number; // Xuất ngày (lấy từ đơn hàng theo ngày)
+  openingStock: number; // Tồn đầu (tự động nhận từ Tồn cuối ngày hôm trước)
+  dailyExport: number; // Xuất ngày (lấy từ Đơn hàng theo ngày)
   closingStock: number; // Tồn cuối (người dùng nhập vào)
-  calculatedImport: number; // Nhập = Tồn cuối + Xuất ngày - Tồn đầu
-  actualImportFromNCC: number; // Thực tế nhập từ NCC trong ngày (nếu có đơn nhập)
+  calculatedImport: number; // Nhập (tìm ra nhập = Tồn cuối + Xuất ngày - Tồn đầu)
+  actualImportFromNCC: number; // Thực tế nhập từ NCC trong ngày (nếu có đơn nhập NCC)
   notes?: string;
-  isOpeningCustom?: boolean; // Người dùng tự sửa tồn đầu thủ công
+  isOpeningCustom?: boolean; // Đánh dấu nếu người dùng tự sửa tồn đầu thủ công
 }
 
 interface DailyStockReconcileState {
   records: Record<string, DailyStockItem[]>; // Key là ngày YYYY-MM-DD
 
-  // Cập nhật số lượng Tồn cuối (người dùng nhập vào ô tồn cuối)
+  // Người dùng nhập/sửa số lượng Tồn cuối
   setClosingStock: (
-    date: string,
+    dateYMD: string,
     flowerId: string,
     closingStock: number,
     flowerInfo?: {
@@ -35,48 +35,75 @@ interface DailyStockReconcileState {
     },
   ) => void;
 
-  // Điều chỉnh tồn đầu thủ công (nếu ngày đầu tiên chưa có tồn cuối hôm trước)
-  setOpeningStock: (date: string, flowerId: string, openingStock: number) => void;
+  // Điều chỉnh tồn đầu thủ công cho một ngày
+  setOpeningStock: (dateYMD: string, flowerId: string, openingStock: number) => void;
 
-  setNotes: (date: string, flowerId: string, notes: string) => void;
-  saveDailyItems: (date: string, items: DailyStockItem[]) => void;
-  deleteItem: (date: string, flowerId: string) => void;
-  clearDate: (date: string) => void;
+  // Ghi chú đối soát
+  setNotes: (dateYMD: string, flowerId: string, notes: string) => void;
+
+  // Thêm mặt hàng hoa vào một ngày
+  addFlowerToDate: (dateYMD: string, item: DailyStockItem) => void;
+
+  // Xóa mặt hàng khỏi ngày
+  deleteItem: (dateYMD: string, flowerId: string) => void;
+
+  // Xóa toàn bộ dữ liệu ngày
+  clearDate: (dateYMD: string) => void;
+}
+
+// Chuẩn hóa chuỗi ngày sang định dạng chuẩn YYYY-MM-DD
+export function normalizeDateToYMD(dStr?: string): string {
+  if (!dStr) return '';
+  const trimmed = dStr.trim();
+  if (!trimmed) return '';
+  if (trimmed.includes('T')) return trimmed.split('T')[0];
+  if (trimmed.includes('/')) {
+    const parts = trimmed.split('/');
+    if (parts.length === 3) {
+      const p0 = parts[0].trim();
+      const p1 = parts[1].trim();
+      const p2 = parts[2].trim();
+      if (p0.length === 4) {
+        return `${p0}-${p1.padStart(2, '0')}-${p2.padStart(2, '0')}`;
+      }
+      return `${p2}-${p1.padStart(2, '0')}-${p0.padStart(2, '0')}`;
+    }
+  }
+  return trimmed;
+}
+
+// Chuyển YYYY-MM-DD sang định dạng hiển thị tiếng Việt DD/MM/YYYY
+export function formatYMDToDisplay(ymdStr: string): string {
+  if (!ymdStr) return '';
+  const normalized = normalizeDateToYMD(ymdStr);
+  const parts = normalized.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return ymdStr;
 }
 
 // Tìm Tồn cuối của ngày hôm trước (hoặc ngày gần nhất trước ngày hiện tại)
 export function getPreviousClosingStock(
   records: Record<string, DailyStockItem[]>,
-  currentDate: string,
-  flowerId: string,
+  currentDateYMD: string,
+  flowerIdOrCode: string,
 ): number | undefined {
-  // 1. Kiểm tra ngày hôm qua chính xác (D - 1)
-  const prevDate = new Date(currentDate);
-  prevDate.setDate(prevDate.getDate() - 1);
-  const prevDateStr = prevDate.toISOString().split('T')[0];
-
-  const yesterdayItems = records[prevDateStr];
-  if (yesterdayItems && yesterdayItems.length > 0) {
-    const it = yesterdayItems.find(
-      (i) => i.flowerId === flowerId || (i.flowerCode && i.flowerCode.toLowerCase() === flowerId.toLowerCase()),
-    );
-    if (it && it.closingStock !== undefined && it.closingStock !== null) {
-      return it.closingStock;
-    }
-  }
-
-  // 2. Tìm ngày ghi nhận gần nhất trước ngày hiện tại (nếu có ngày nghỉ/cuối tuần)
+  const normCurrent = normalizeDateToYMD(currentDateYMD);
   const pastDates = Object.keys(records)
-    .filter((d) => d < currentDate)
-    .sort((a, b) => b.localeCompare(a));
+    .map(normalizeDateToYMD)
+    .filter((d) => d < normCurrent)
+    .sort((a, b) => b.localeCompare(a)); // Ngày mới nhất trong quá khứ đứng đầu
 
-  for (const d of pastDates) {
-    const items = records[d];
-    const it = items?.find(
-      (i) => i.flowerId === flowerId || (i.flowerCode && i.flowerCode.toLowerCase() === flowerId.toLowerCase()),
+  for (const prevDate of pastDates) {
+    const items = records[prevDate];
+    const prevItem = items?.find(
+      (i) =>
+        i.flowerId === flowerIdOrCode ||
+        (i.flowerCode && i.flowerCode.trim().toLowerCase() === flowerIdOrCode.trim().toLowerCase()),
     );
-    if (it && it.closingStock !== undefined && it.closingStock !== null) {
-      return it.closingStock;
+    if (prevItem && prevItem.closingStock !== undefined && prevItem.closingStock !== null) {
+      return prevItem.closingStock;
     }
   }
 
@@ -88,9 +115,10 @@ export const useDailyStockReconcileStore = create<DailyStockReconcileState>()(
     (set) => ({
       records: {},
 
-      setClosingStock: (date, flowerId, closingStock, flowerInfo) =>
+      setClosingStock: (dateYMD, flowerId, closingStock, flowerInfo) =>
         set((state) => {
-          const dayItems = state.records[date] || [];
+          const normDate = normalizeDateToYMD(dateYMD);
+          const dayItems = state.records[normDate] || [];
           const existingIndex = dayItems.findIndex((it) => it.flowerId === flowerId);
 
           const closing = Math.max(0, closingStock || 0);
@@ -112,14 +140,14 @@ export const useDailyStockReconcileStore = create<DailyStockReconcileState>()(
           } else {
             const opening =
               flowerInfo?.openingStock ??
-              getPreviousClosingStock(state.records, date, flowerId) ??
+              getPreviousClosingStock(state.records, normDate, flowerId) ??
               0;
             const exportQty = flowerInfo?.dailyExport || 0;
             const calcImport = Math.max(0, closing + exportQty - opening);
 
             const newItem: DailyStockItem = {
-              id: `${date}_${flowerId}`,
-              date,
+              id: `${normDate}_${flowerId}`,
+              date: normDate,
               flowerId,
               flowerCode: flowerInfo?.flowerCode || '',
               flowerName: flowerInfo?.flowerName || '',
@@ -136,14 +164,15 @@ export const useDailyStockReconcileStore = create<DailyStockReconcileState>()(
           return {
             records: {
               ...state.records,
-              [date]: updatedItems,
+              [normDate]: updatedItems,
             },
           };
         }),
 
-      setOpeningStock: (date, flowerId, openingStock) =>
+      setOpeningStock: (dateYMD, flowerId, openingStock) =>
         set((state) => {
-          const dayItems = state.records[date] || [];
+          const normDate = normalizeDateToYMD(dateYMD);
+          const dayItems = state.records[normDate] || [];
           const existingIndex = dayItems.findIndex((it) => it.flowerId === flowerId);
           if (existingIndex < 0) return state;
 
@@ -163,14 +192,15 @@ export const useDailyStockReconcileStore = create<DailyStockReconcileState>()(
           return {
             records: {
               ...state.records,
-              [date]: updatedItems,
+              [normDate]: updatedItems,
             },
           };
         }),
 
-      setNotes: (date, flowerId, notes) =>
+      setNotes: (dateYMD, flowerId, notes) =>
         set((state) => {
-          const dayItems = state.records[date] || [];
+          const normDate = normalizeDateToYMD(dateYMD);
+          const dayItems = state.records[normDate] || [];
           const existingIndex = dayItems.findIndex((it) => it.flowerId === flowerId);
           if (existingIndex < 0) return state;
 
@@ -183,34 +213,42 @@ export const useDailyStockReconcileStore = create<DailyStockReconcileState>()(
           return {
             records: {
               ...state.records,
-              [date]: updatedItems,
+              [normDate]: updatedItems,
             },
           };
         }),
 
-      saveDailyItems: (date, items) =>
-        set((state) => ({
-          records: {
-            ...state.records,
-            [date]: items,
-          },
-        })),
-
-      deleteItem: (date, flowerId) =>
+      addFlowerToDate: (dateYMD, item) =>
         set((state) => {
-          const dayItems = state.records[date] || [];
+          const normDate = normalizeDateToYMD(dateYMD);
+          const dayItems = state.records[normDate] || [];
+          const exists = dayItems.some((i) => i.flowerId === item.flowerId);
+          if (exists) return state;
           return {
             records: {
               ...state.records,
-              [date]: dayItems.filter((i) => i.flowerId !== flowerId),
+              [normDate]: [...dayItems, item],
             },
           };
         }),
 
-      clearDate: (date) =>
+      deleteItem: (dateYMD, flowerId) =>
         set((state) => {
+          const normDate = normalizeDateToYMD(dateYMD);
+          const dayItems = state.records[normDate] || [];
+          return {
+            records: {
+              ...state.records,
+              [normDate]: dayItems.filter((i) => i.flowerId !== flowerId),
+            },
+          };
+        }),
+
+      clearDate: (dateYMD) =>
+        set((state) => {
+          const normDate = normalizeDateToYMD(dateYMD);
           const copy = { ...state.records };
-          delete copy[date];
+          delete copy[normDate];
           return { records: copy };
         }),
     }),
