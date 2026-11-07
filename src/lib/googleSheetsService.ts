@@ -1,4 +1,4 @@
-import { actionLabels, useModuleAuditStore } from '@/stores/moduleAuditStore';
+import { actionLabels, pauseModuleAudit, useModuleAuditStore } from '@/stores/moduleAuditStore';
 import { GOOGLE_SHEETS_CONFIG } from '@/config/googleSheetsConfig';
 import {
   useCashStore,
@@ -7,6 +7,7 @@ import {
   useEmployeeStore,
   useFlowerStore,
   useInventoryStore,
+  normalizeOrders,
   useOrderStore,
   useSupplierOrderStore,
   useSupplierStore,
@@ -20,6 +21,7 @@ import type {
   Flower,
   InventoryItem,
   Order,
+  OrderItem,
   Supplier,
   SupplierOrder,
 } from '@/types/hoaKhangThanh';
@@ -186,12 +188,15 @@ export async function syncAllToGoogleSheets(): Promise<SyncResult> {
  * Tải toàn bộ dữ liệu từ Google Sheets về cập nhật vào tất cả Store trên web
  */
 export async function pullFromGoogleSheets(): Promise<{ success: boolean; message: string }> {
+  let resumeAudit: (() => void) | undefined;
   try {
     const res = await fetch('/api/google-sheets/pull-all');
     const result = await res.json();
     if (!res.ok || !result.success) {
       throw new Error(result.error ? JSON.stringify(result.error) : 'Lỗi khi tải từ Google Sheets');
     }
+
+    resumeAudit = pauseModuleAudit();
 
     const valueRanges: Array<{ range: string; values?: any[][] }> = result.valueRanges || [];
 
@@ -333,7 +338,7 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
           id: prev?.id || `nv-sync-${idx + 1}`,
           code,
           fullName: String(r[1] || '').trim(),
-          username: String(r[2] || '').trim() || prev?.username || '',
+          username: String(r[2] || '').trim() || prev?.username || code.toLowerCase().replace('-', ''),
           position: String(r[3] || '').trim(),
           department: String(r[4] || '').trim(),
           role: (r[5] === 'Quản trị viên' ? 'admin' : 'member') as Employee['role'],
@@ -342,7 +347,7 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
           joinDate: String(r[8] || '').trim(),
           salary: parseSheetNumber(r[9]) || 0,
           status: 'active' as Employee['status'],
-          password: prev?.password,
+          password: (r[11] ? String(r[11]).trim() : undefined) || prev?.password || '123456',
         };
       });
       useEmployeeStore.setState({ employees });
@@ -437,15 +442,72 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
       counts['cong_no'] = records.length;
     }
 
-    // --- 8. DON_HANG ---
+    // --- 8. DON_HANG + CHI_TIET_DON_HANG ---
+    // Chi tiết hoa được lưu ở sheet riêng. Phải ghép lại theo mã đơn khi tải về;
+    // nếu không, việc đăng nhập/đồng bộ xuống sẽ thay toàn bộ items bằng mảng rỗng.
     // Giữ nguyên thứ tự dòng của Google Sheets (hàng cũ ở trên, hàng mới thêm ở dưới cùng)
     const donHangRows = sheetMap['DON_HANG'] || [];
     if (donHangRows.length > 0) {
       const existingOrders = useOrderStore.getState().orders;
       const existingOrderMap = new Map(existingOrders.map((o) => [o.code, o]));
-      const orders: Order[] = donHangRows.filter((r) => r[0] && r[1]).map((r, idx) => {
+      const flowers = useFlowerStore.getState().flowers;
+      const flowerByCode = new Map(flowers.map((flower) => [flower.code.trim().toLowerCase(), flower]));
+      const flowerByName = new Map(flowers.map((flower) => [flower.name.trim().toLowerCase(), flower]));
+      // Bỏ các dòng trùng hoàn toàn do các lần đồng bộ cũ ghi lặp.
+      const seenOrderRows = new Set<string>();
+      const uniqueOrderRows = donHangRows.filter((row) => {
+        const key = JSON.stringify(row.slice(0, 18));
+        if (seenOrderRows.has(key)) return false;
+        seenOrderRows.add(key);
+        return true;
+      });
+      const seenDetailRows = new Set<string>();
+      const detailRows = (sheetMap['CHI_TIET_DON_HANG'] || []).filter((row) => {
+        const key = JSON.stringify(row.slice(0, 12));
+        if (seenDetailRows.has(key)) return false;
+        seenDetailRows.add(key);
+        return true;
+      });
+      const itemsByOrderCode = new Map<string, OrderItem[]>();
+
+      for (const row of detailRows) {
+        const orderCode = String(row[0] || '').trim();
+        const flowerCode = String(row[3] || '').trim();
+        const flowerName = String(row[4] || '').trim();
+        if (!orderCode || (!flowerCode && !flowerName)) continue;
+
+        const previousItem = existingOrderMap.get(orderCode)?.items.find((item) =>
+          (flowerCode && item.flowerCode.trim().toLowerCase() === flowerCode.toLowerCase()) ||
+          (flowerName && item.flowerName.trim().toLowerCase() === flowerName.toLowerCase()),
+        );
+        const matchedFlower =
+          flowerByCode.get(flowerCode.toLowerCase()) || flowerByName.get(flowerName.toLowerCase());
+        const quantity = parseSheetNumber(row[5]);
+        const costPrice = parseSheetNumber(row[7]);
+        const unitPrice = parseSheetNumber(row[8]);
+        const importTotal = parseSheetNumber(row[9]) || quantity * costPrice;
+        const amount = parseSheetNumber(row[10]) || quantity * unitPrice;
+        const item: OrderItem = {
+          flowerId: matchedFlower?.id || previousItem?.flowerId || `hoa-sheet-${flowerCode || flowerName}`,
+          flowerCode,
+          flowerName,
+          quantity,
+          unit: String(row[6] || matchedFlower?.unit || previousItem?.unit || 'Cành').trim(),
+          costPrice,
+          unitPrice,
+          importTotal,
+          amount,
+          profit: parseSheetNumber(row[11]) || amount - importTotal,
+        };
+        const currentItems = itemsByOrderCode.get(orderCode) || [];
+        currentItems.push(item);
+        itemsByOrderCode.set(orderCode, currentItems);
+      }
+
+      const orders = normalizeOrders(uniqueOrderRows.filter((r) => r[0] && r[1]).map((r, idx): Order => {
         const code = String(r[0] || '').trim();
         const prev = existingOrderMap.get(code);
+        const sheetItems = itemsByOrderCode.get(code);
         return {
           id: prev?.id || `dh-sync-${idx + 1}`,
           code,
@@ -466,10 +528,11 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
           paymentStatus: (String(r[15] || prev?.paymentStatus || 'unpaid').trim()) as Order['paymentStatus'],
           creator: String(r[16] || '').trim() || prev?.creator || '',
           notes: String(r[17] || '').trim() || prev?.notes || '',
-          items: prev?.items || [],
+          // Ưu tiên chi tiết từ Sheets; chỉ giữ dữ liệu cục bộ khi sheet chưa có dòng chi tiết.
+          items: sheetItems?.length ? sheetItems : (prev?.items || []),
           updatedAt: prev?.updatedAt,
         };
-      });
+      }));
       useOrderStore.setState({ orders });
       counts['don_hang'] = orders.length;
     }
@@ -528,5 +591,7 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
       success: false,
       message: err?.message || 'Lỗi khi tải từ Google Sheets',
     };
+  } finally {
+    resumeAudit?.();
   }
 }

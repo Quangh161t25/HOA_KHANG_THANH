@@ -1,22 +1,24 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Spinner } from '@/components/ui/Feedback';
 import { useAuthStore } from '@/stores/auth';
 import LoginPage from '@/modules/auth/LoginPage';
+import { pageLoaders, preloadRoute } from '@/modules/routeLoaders';
 
-const DashboardPage = lazy(() => import('@/modules/dashboard/DashboardPage'));
-const DonHangPage = lazy(() => import('@/modules/don-hang/DonHangPage'));
-const DonHangNCCPage = lazy(() => import('@/modules/don-hang-ncc/DonHangNCCPage'));
-const HoaPage = lazy(() => import('@/modules/hoa/HoaPage'));
-const TonKhoPage = lazy(() => import('@/modules/ton-kho/TonKhoPage'));
-const NCCPage = lazy(() => import('@/modules/ncc/NCCPage'));
-const NPPPage = lazy(() => import('@/modules/npp/NPPPage'));
-const CongNoPage = lazy(() => import('@/modules/cong-no/CongNoPage'));
-const ThuChiPage = lazy(() => import('@/modules/thu-chi/ThuChiPage'));
-const NhanVienPage = lazy(() => import('@/modules/nhan-vien/NhanVienPage'));
-const PhanQuyenPage = lazy(() => import('@/modules/phan-quyen/PhanQuyenPage'));
+const DashboardPage = lazy(pageLoaders.dashboard);
+const DonHangPage = lazy(pageLoaders.donHang);
+const DonHangNCCPage = lazy(pageLoaders.donHangNcc);
+const HoaPage = lazy(pageLoaders.hoa);
+const TonKhoPage = lazy(pageLoaders.tonKho);
+const TonNgayPage = lazy(pageLoaders.tonNgay);
+const NCCPage = lazy(pageLoaders.ncc);
+const NPPPage = lazy(pageLoaders.npp);
+const CongNoPage = lazy(pageLoaders.congNo);
+const ThuChiPage = lazy(pageLoaders.thuChi);
+const NhanVienPage = lazy(pageLoaders.nhanVien);
+const PhanQuyenPage = lazy(pageLoaders.phanQuyen);
 
 const PAGE_FALLBACK = (
   <div className="flex-1 flex items-center justify-center py-20">
@@ -26,6 +28,31 @@ const PAGE_FALLBACK = (
 
 export default function App() {
   const { user } = useAuthStore();
+
+  useEffect(() => {
+    if (!user) return;
+    const paths = ['/don-hang', '/don-hang-ncc', '/cong-no', '/hoa', '/nha-phan-phoi', '/nha-cung-cap', '/ton-kho', '/ton-ngay', '/thu-chi', '/nhan-vien', '/phan-quyen'];
+    let cancelled = false;
+    let timer = 0;
+    let index = 0;
+    const loadNext = () => {
+      if (cancelled || index >= paths.length) return;
+      const target = paths[index++];
+      const pending = preloadRoute(target);
+      void pending?.finally(() => {
+        timer = window.setTimeout(loadNext, 180);
+      });
+    };
+    const idleId = window.requestIdleCallback
+      ? window.requestIdleCallback(loadNext, { timeout: 2500 })
+      : window.setTimeout(loadNext, 800);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      if (window.cancelIdleCallback) window.cancelIdleCallback(idleId);
+      else window.clearTimeout(idleId);
+    };
+  }, [user]);
 
   if (!user) {
     return (
@@ -49,6 +76,8 @@ export default function App() {
             <Route path="/hoa" element={<HoaPage />} />
             <Route path="/danh-sach-hoa" element={<HoaPage />} />
             <Route path="/ton-kho" element={<TonKhoPage />} />
+            <Route path="/ton-ngay" element={<TonNgayPage />} />
+            <Route path="/kiem-ton-ngay" element={<TonNgayPage />} />
             <Route path="/nha-cung-cap" element={<NCCPage />} />
             <Route path="/ncc" element={<NCCPage />} />
             <Route path="/nha-phan-phoi" element={<NPPPage />} />

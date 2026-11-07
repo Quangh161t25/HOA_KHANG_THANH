@@ -440,12 +440,14 @@ export default function NCCPage() {
         </div>
       )}
 
-      <NCCDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        supplier={selectedSupplier}
-        mode={drawerMode}
-      />
+      {isDrawerOpen && (
+        <NCCDrawer
+          isOpen
+          onClose={() => setIsDrawerOpen(false)}
+          supplier={selectedSupplier}
+          mode={drawerMode}
+        />
+      )}
     </div>
   );
 }

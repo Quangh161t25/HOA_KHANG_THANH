@@ -444,19 +444,23 @@ export default function ThuChiPage() {
       )}
 
       {/* Drawer */}
-      <ThuChiDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        transaction={selectedTransaction}
-        mode={drawerMode}
-        defaultType={defaultCreateType}
-      />
+      {isDrawerOpen && (
+        <ThuChiDrawer
+          isOpen
+          onClose={() => setIsDrawerOpen(false)}
+          transaction={selectedTransaction}
+          mode={drawerMode}
+          defaultType={defaultCreateType}
+        />
+      )}
 
       {/* Modal Quản lý nút chi phí cố định */}
-      <FixedExpenseModal
-        isOpen={isFixedModalOpen}
-        onClose={() => setIsFixedModalOpen(false)}
-      />
+      {isFixedModalOpen && (
+        <FixedExpenseModal
+          isOpen
+          onClose={() => setIsFixedModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

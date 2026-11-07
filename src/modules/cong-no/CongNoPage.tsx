@@ -1290,13 +1290,15 @@ export default function CongNoPage() {
       )}
 
       {/* Drawer */}
-      <CongNoDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        record={selectedRecord}
-        mode={drawerMode}
-        defaultPartnerType={activeTab === 'ncc' ? 'ncc' : 'npp'}
-      />
+      {isDrawerOpen && (
+        <CongNoDrawer
+          isOpen
+          onClose={() => setIsDrawerOpen(false)}
+          record={selectedRecord}
+          mode={drawerMode}
+          defaultPartnerType={activeTab === 'ncc' ? 'ncc' : 'npp'}
+        />
+      )}
     </div>
   );
 }

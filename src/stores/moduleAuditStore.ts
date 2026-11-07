@@ -15,10 +15,20 @@ export interface ModuleAuditLog {
   changes: { field: string; before: string; after: string }[];
 }
 
+let auditPauseDepth = 0;
+
+/** Tạm ngưng ghi lịch sử khi đang áp dữ liệu hàng loạt từ Google Sheets. */
+export function pauseModuleAudit() {
+  auditPauseDepth += 1;
+  return () => {
+    auditPauseDepth = Math.max(0, auditPauseDepth - 1);
+  };
+}
+
 export const useModuleAuditStore = create<{ logs: ModuleAuditLog[]; append: (logs: ModuleAuditLog[]) => void }>()(
   persist((set) => ({
     logs: [],
-    append: (logs) => set((state) => ({ logs: [...logs, ...state.logs] })),
+    append: (logs) => set((state) => ({ logs: [...logs, ...state.logs].slice(0, 500) })),
   }), { name: 'hkt-module-audit-storage' }),
 );
 
@@ -55,6 +65,7 @@ function display(value: unknown): string {
 // Observing stores also captures bulk actions and updates from related modules.
 export function watchModule<S, T extends object>(store: StoreApi<S>, select: (state: S) => T[], module: AuditModule, key: (row: T) => string) {
   return store.subscribe((state, previous) => {
+    if (auditPauseDepth > 0) return;
     const rows = select(state);
     const oldRows = select(previous);
     if (rows === oldRows) return;

@@ -173,7 +173,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
             o.orderDate || '',
             o.distributorName || '',
             o.phone || '',
-            o.shippingAddress || '',
+            o.address || '',
             totalQty,
             subtotal,
             o.shippingFee || 0,
@@ -229,7 +229,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
         const rows = body.flowers.map((f) => [
           f.code || '',
           f.name || '',
-          Array.isArray(f.customNames) ? f.customNames.join(', ') : (f.customNames || ''),
+          f.customName || '',
           f.unit || 'cành',
           f.category || '',
           f.status || 'Đang bán',
@@ -466,7 +466,6 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
         'CHI_TIET_DON_HANG!A2:L',
         'DON_NHAP_NCC!A2:L',
         'CONG_NO!A2:I',
-        'LICH_SU_THAO_TAC!A2:J',
       ];
 
       const rangeParam = ranges.map((r) => `ranges=${encodeURIComponent(r)}`).join('&');

@@ -30,6 +30,7 @@ import { checkCustomerOverdueDebt } from '@/lib/debtCheck';
 import { getDistributorDebtAsOfDate } from '@/lib/orderDebtHelper';
 import { formatDate } from '@/lib/format';
 import { PartnerAutocomplete, type PartnerOption } from '@/components/ui/PartnerAutocomplete';
+import { useAuthStore } from '@/stores/auth';
 
 dayjs.extend(customParseFormat);
 
@@ -38,14 +39,6 @@ interface Props {
   onClose: () => void;
   orderToEdit?: Order | null;
 }
-
-const CREATORS = [
-  'Lê Minh Công',
-  'Lê Hoàng Nam',
-  'Lê Tuấn Hùng',
-  'Nguyễn Văn Khang',
-  'Trần Thị Kim Thành',
-];
 
 // Component ô nhập số có tự động phân cách hàng nghìn bằng dấu chấm (.)
 // Hỗ trợ gợi ý thông minh cho giá tiền: gõ 5 -> gợi ý 5.000, 50.000, 500.000; gõ 34 -> gợi ý 34.000, 340.000, 3.400.000
@@ -413,13 +406,15 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
   const flowers = useFlowerStore((s) => s.flowers);
   const addOrder = useOrderStore((s) => s.addOrder);
   const updateOrder = useOrderStore((s) => s.updateOrder);
+  const currentUser = useAuthStore((s) => s.user);
+  const loggedInCreator = currentUser?.full_name?.trim() || currentUser?.code || 'Người dùng';
 
   const [code, setCode] = useState('');
   const [distributorId, setDistributorId] = useState('');
   const [partnerName, setPartnerName] = useState('');
   const [isCustomPartner, setIsCustomPartner] = useState(false);
   const [phone, setPhone] = useState('');
-  const [creator, setCreator] = useState(CREATORS[0]);
+  const [creator, setCreator] = useState(loggedInCreator);
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
   const [status, setStatus] = useState<Order['status']>('nhap');
   const [notes, setNotes] = useState('');
@@ -528,7 +523,7 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
       setPartnerName(orderToEdit.distributorName || '');
       setIsCustomPartner(!distributors.some((d) => d.id === orderToEdit.distributorId));
       setPhone(orderToEdit.phone || '');
-      setCreator(orderToEdit.creator || CREATORS[0]);
+      setCreator(orderToEdit.creator || loggedInCreator);
       setOrderDate(orderToEdit.orderDate || new Date().toISOString().split('T')[0]);
       setStatus(orderToEdit.status || 'nhap');
       setNotes(orderToEdit.notes || '');
@@ -562,35 +557,34 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
       setItems(mappedItems);
     } else {
       const year = new Date().getFullYear();
-      const num = Math.floor(100 + Math.random() * 900);
-      setCode(`DH-${year}-${num}`);
+      const prefix = `DH-${year}-`;
+      const usedCodes = new Set(useOrderStore.getState().orders.map((order) => order.code.trim().toLowerCase()));
+      const highestNumber = useOrderStore.getState().orders.reduce((highest, order) => {
+        if (!order.code.startsWith(prefix)) return highest;
+        const suffix = Number(order.code.slice(prefix.length));
+        return Number.isFinite(suffix) ? Math.max(highest, suffix) : highest;
+      }, 0);
+      let nextNumber = highestNumber + 1;
+      let nextCode = `${prefix}${String(nextNumber).padStart(3, '0')}`;
+      while (usedCodes.has(nextCode.toLowerCase())) {
+        nextNumber += 1;
+        nextCode = `${prefix}${String(nextNumber).padStart(3, '0')}`;
+      }
+      setCode(nextCode);
 
-      const firstDist = distributors[0];
       const today = new Date().toISOString().split('T')[0];
-      setDistributorId(firstDist?.id || '');
-      setPartnerName(firstDist?.name || 'Đại lý Hoa Sỉ');
+      setDistributorId('');
+      setPartnerName('');
       setIsCustomPartner(false);
-      setPhone(firstDist?.phone || '0903 112 233');
-      setCreator(CREATORS[0]);
+      setPhone('');
+      setCreator(loggedInCreator);
       setOrderDate(today);
       setStatus('nhap');
       setNotes('');
       setShippingFee(0);
       setDiscount(0);
 
-      // Lấy công nợ của đối tác tính đến ngày tạo đơn
-      const initialDebt = firstDist
-        ? getDistributorDebtAsOfDate(
-            firstDist.id,
-            firstDist.name,
-            today,
-            useOrderStore.getState().orders,
-            useDebtStore.getState().records,
-            distributors,
-          )
-        : 0;
-
-      setOldDebt(initialDebt);
+      setOldDebt(0);
       setPaidAmount(0);
 
       // THÊM MỚI: ĐỂ TRỐNG Ô NHẬP HOA, SỐ LƯỢNG VÀ GIÁ ĐỂ NGƯỜI DÙNG TỰ NHẬP
@@ -609,7 +603,8 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
         },
       ]);
     }
-  }, [orderToEdit, isOpen, distributors, flowers]);
+  // Khởi tạo form khi mở/chuyển đơn; không reset dữ liệu đang nhập khi danh mục nền đồng bộ lại.
+  }, [orderToEdit, loggedInCreator]);
 
   // Xử lý thay đổi ngày đặt - Cập nhật ngay công nợ cũ của đối tác tính đến ngày đó trong 1 lượt render
   const handleOrderDateChange = (newDate: string) => {
@@ -893,6 +888,14 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const finalCode = code.trim() || `DH-${Date.now().toString().slice(-6)}`;
+    const duplicateCode = useOrderStore.getState().orders.find(
+      (order) => order.id !== orderToEdit?.id && order.code.trim().toLowerCase() === finalCode.toLowerCase(),
+    );
+    if (duplicateCode) {
+      toast.error(`Mã đơn ${finalCode} đã tồn tại. Vui lòng dùng mã đơn khác.`);
+      return;
+    }
     const validItems = items.filter((i) => i.flowerId && i.flowerName);
     // Nhắc nhở nếu khách chưa trả nợ đơn hàng quá 4 ngày
     if (debtCheck.hasOverdueUnpaidDebt && debtCheck.earliestUnpaidOrder) {
@@ -903,7 +906,7 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
     }
 
     const payload = {
-      code: code.trim() || `DH-${Date.now().toString().slice(-4)}`,
+      code: finalCode,
       distributorId: isCustomPartner ? undefined : distributorId,
       distributorName: partnerName.trim() || 'Khách vãng lai',
       phone,
@@ -1024,17 +1027,13 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
                 <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                   Người lập đơn
                 </label>
-                <select
+                <input
+                  type="text"
                   value={creator}
-                  onChange={(e) => setCreator(e.target.value)}
-                  className="w-full h-8 px-2 rounded-lg border border-border bg-background text-xs text-foreground focus:ring-1 focus:ring-primary"
-                >
-                  {CREATORS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                  readOnly
+                  className="w-full h-8 px-2 rounded-lg border border-border bg-muted/60 text-xs font-semibold text-foreground cursor-default"
+                  title={orderToEdit ? 'Người lập ban đầu của đơn hàng' : 'Tự động lấy từ tài khoản đang đăng nhập'}
+                />
               </div>
             </div>
 

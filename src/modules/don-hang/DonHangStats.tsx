@@ -8,6 +8,7 @@ import {
   Layers,
   ListFilter,
   PackageCheck,
+  Printer,
   Search,
   ShoppingCart,
   TrendingUp,
@@ -665,6 +666,245 @@ export function DonHangStats() {
     }
   };
 
+  // In PDF danh sách hoa mua (Tên hoa + Tổng số lượng mua)
+  const handlePrintPdfFlowerQuantity = () => {
+    const printFrame = document.createElement('iframe');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+
+    const doc = printFrame.contentWindow?.document;
+    if (!doc) return;
+
+    // Xác định thông tin khoảng thời gian lọc
+    const timeFilterText =
+      startDate && endDate
+        ? startDate === endDate
+          ? `Ngày: ${formatDate(startDate)}`
+          : `Từ ${formatDate(startDate)} đến ${formatDate(endDate)}`
+        : startDate
+        ? `Từ ngày ${formatDate(startDate)}`
+        : endDate
+        ? `Đến ngày ${formatDate(endDate)}`
+        : 'Toàn bộ thời gian';
+
+    const partnerFilterText =
+      selectedPartner !== 'all' ? ` • Đối tác: ${selectedPartner}` : '';
+
+    const rowsHtml = aggregatedFlowerRows.length === 0
+      ? `<tr><td colspan="4" style="text-align: center; padding: 24px; color: #64748b; font-style: italic;">Không có dữ liệu mặt hàng hoa nào.</td></tr>`
+      : aggregatedFlowerRows
+          .map((r, idx) => {
+            const extraName = r.customName ? ` <span style="font-size: 11px; color: #64748b; font-style: italic;">(${r.customName})</span>` : '';
+            return `
+              <tr>
+                <td style="text-align: center; font-family: monospace; font-weight: 600; color: #475569;">${idx + 1}</td>
+                <td style="font-family: monospace; font-weight: 700; color: #0284c7;">${r.flowerCode || '—'}</td>
+                <td style="font-weight: 700; color: #0f172a; font-size: 14px;">${r.flowerName}${extraName}</td>
+                <td style="text-align: right; font-family: monospace; font-weight: 800; font-size: 15px; color: #0f172a;">${formatNumber(r.totalQuantity)}</td>
+              </tr>
+            `;
+          })
+          .join('');
+
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html lang="vi">
+      <head>
+        <meta charset="UTF-8">
+        <title>Bảng Tổng Hợp Số Lượng Hoa Mua - ${todayISODate()}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+        <style>
+          @page { size: A4 portrait; margin: 12mm 15mm; }
+          * { box-sizing: border-box; }
+          body {
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #1e293b;
+            background: #ffffff;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+          }
+          .header {
+            border-bottom: 2px solid #0f172a;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          }
+          .brand-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: #b45309;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 0 0 4px 0;
+          }
+          .doc-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: #0f172a;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 0;
+          }
+          .doc-subtitle {
+            font-size: 12px;
+            color: #475569;
+            margin-top: 4px;
+            font-weight: 500;
+          }
+          .meta-info {
+            text-align: right;
+            font-size: 11px;
+            color: #64748b;
+          }
+          .kpi-box {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px 14px;
+          }
+          .kpi-item {
+            flex: 1;
+          }
+          .kpi-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #64748b;
+            letter-spacing: 0.5px;
+          }
+          .kpi-value {
+            font-size: 16px;
+            font-weight: 800;
+            font-family: monospace;
+            color: #0f172a;
+            margin-top: 2px;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+          }
+          thead th {
+            background-color: #f1f5f9;
+            color: #334155;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-top: 1.5px solid #0f172a;
+            border-bottom: 1.5px solid #0f172a;
+            padding: 8px 10px;
+          }
+          tbody td {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 8px 10px;
+            vertical-align: middle;
+          }
+          tbody tr:nth-child(even) {
+            background-color: #fafafa;
+          }
+          tfoot td {
+            border-top: 2px solid #0f172a;
+            border-bottom: 2px solid #0f172a;
+            padding: 10px 10px;
+            font-weight: 800;
+            background-color: #f8fafc;
+          }
+          .footer-note {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #64748b;
+            font-style: italic;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="brand-title">Hoa Khang Thành</div>
+            <div class="doc-title">BẢNG TỔNG HỢP SỐ LƯỢNG HOA MUA</div>
+            <div class="doc-subtitle">${timeFilterText}${partnerFilterText}</div>
+          </div>
+          <div class="meta-info">
+            <div>Ngày in: <strong>${formatDate(todayISODate())}</strong></div>
+            <div>Tổng: <strong>${aggregatedFlowerRows.length}</strong> loại hoa</div>
+          </div>
+        </div>
+
+        <div class="kpi-box">
+          <div class="kpi-item">
+            <div class="kpi-label">Tổng số lượng hoa mua</div>
+            <div class="kpi-value" style="color: #0284c7;">${formatNumber(summaryReportKPI.totalQty)} hoa</div>
+          </div>
+          <div class="kpi-item">
+            <div class="kpi-label">Chủng loại hoa</div>
+            <div class="kpi-value">${formatNumber(summaryReportKPI.uniqueFlowers)} loại</div>
+          </div>
+          <div class="kpi-item">
+            <div class="kpi-label">Số đơn đặt liên quan</div>
+            <div class="kpi-value">${formatNumber(summaryReportKPI.uniqueOrders)} đơn</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 45px; text-align: center;">STT</th>
+              <th style="width: 120px; text-align: left;">MÃ HOA</th>
+              <th style="text-align: left;">TÊN HOA</th>
+              <th style="width: 150px; text-align: right;">TỔNG SL MUA</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" style="text-align: right; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px;">
+                TỔNG CỘNG (${aggregatedFlowerRows.length} LOẠI HOA):
+              </td>
+              <td style="text-align: right; font-family: monospace; font-size: 16px; font-weight: 800; color: #0284c7;">
+                ${formatNumber(summaryReportKPI.totalQty)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div class="footer-note">
+          <div>* Bảng kê kiểm hàng / xuất kho theo tên hoa và tổng số lượng mua</div>
+          <div>In từ hệ thống Quản lý Phân phối Hoa Khang Thành</div>
+        </div>
+      </body>
+      </html>
+    `);
+    doc.close();
+
+    setTimeout(() => {
+      printFrame.contentWindow?.focus();
+      printFrame.contentWindow?.print();
+      setTimeout(() => {
+        if (document.body.contains(printFrame)) {
+          document.body.removeChild(printFrame);
+        }
+      }, 1500);
+    }, 400);
+  };
+
   const renderStatusBadge = (status: Order['status']) => {
     switch (status) {
       case 'nhap':
@@ -802,7 +1042,17 @@ export function DonHangStats() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handlePrintPdfFlowerQuantity}
+              className="h-8 gap-1.5 text-xs font-semibold text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+              title="In PDF bảng tổng hợp tên hoa và tổng số lượng mua"
+            >
+              <Printer size={13} />
+              <span>In PDF (Tên hoa + SL)</span>
+            </Button>
             <Button
               size="sm"
               variant="outline"

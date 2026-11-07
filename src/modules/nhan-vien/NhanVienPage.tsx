@@ -457,12 +457,14 @@ export default function NhanVienPage() {
       )}
 
       {/* Drawer */}
-      <NhanVienDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        employee={selectedEmployee}
-        mode={drawerMode}
-      />
+      {isDrawerOpen && (
+        <NhanVienDrawer
+          isOpen
+          onClose={() => setIsDrawerOpen(false)}
+          employee={selectedEmployee}
+          mode={drawerMode}
+        />
+      )}
     </div>
   );
 }

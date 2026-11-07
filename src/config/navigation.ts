@@ -1,5 +1,6 @@
 import {
   Boxes,
+  ClipboardCheck,
   Flower2,
   LayoutDashboard,
   PackagePlus,
@@ -57,6 +58,13 @@ export const NAV_ITEMS: NavItem[] = [
     descriptionKey: 'Kiểm soát kho lạnh & xuất nhập tồn',
     icon: Boxes,
     gradient: 'bg-gradient-to-br from-amber-500 to-amber-700',
+  },
+  {
+    path: '/ton-ngay',
+    nameKey: 'Tồn ngày',
+    descriptionKey: 'Kiểm tồn & đối soát đơn hàng mỗi ngày',
+    icon: ClipboardCheck,
+    gradient: 'bg-gradient-to-br from-cyan-500 to-blue-600',
   },
   {
     path: '/nha-cung-cap',

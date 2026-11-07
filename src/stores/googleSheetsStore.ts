@@ -207,6 +207,7 @@ export const useGoogleSheetsStore = create<GoogleSheetsState>()(
 
 let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let isInitialized = false;
+let applyingRemoteData = false;
 
 /**
  * Tự động đồng bộ lên Google Sheets mỗi khi có thay đổi dữ liệu đơn hàng, hoa, NPP, NCC, thu chi
@@ -216,6 +217,7 @@ export function initGoogleSheetsAutoSync() {
   isInitialized = true;
 
   const handleStoreChange = () => {
+    if (applyingRemoteData) return;
     const { autoSync, syncToSheets, isSyncing } = useGoogleSheetsStore.getState();
     if (!autoSync) return;
     if (isSyncing) {
@@ -234,24 +236,25 @@ export function initGoogleSheetsAutoSync() {
     }, 2000);
   };
 
-  // Tự động PULL từ GG Sheets khi app khởi động (sau 1.5s để store hydrate xong từ localStorage).
-  // Giúp dữ liệu người dùng nhập tay vào GG Sheets được tải về app ngay khi load trang.
-  // Sau khi pull xong mới bắt đầu lắng nghe thay đổi để push (tránh push đè lên dữ liệu vừa pull).
-  setTimeout(async () => {
-    const { autoSync, pullFromSheets, checkStatus } = useGoogleSheetsStore.getState();
-    if (!autoSync) {
-      // Nếu auto-sync tắt, chỉ bắt subscriptions, không pull
-      _startSubscriptions(handleStoreChange);
-      return;
-    }
-    await checkStatus();
-    const { isConnected } = useGoogleSheetsStore.getState();
-    if (isConnected) {
+  _startSubscriptions(handleStoreChange);
+
+  // Chỉ tải nền khi trình duyệt rảnh, tránh giật đúng lúc mở trang hoặc biểu mẫu.
+  const refreshFromSheets = async () => {
+    const { autoSync, pullFromSheets } = useGoogleSheetsStore.getState();
+    if (!autoSync) return;
+    applyingRemoteData = true;
+    try {
       await pullFromSheets();
+    } finally {
+      applyingRemoteData = false;
     }
-    // Bắt đầu lắng nghe thay đổi SAU khi pull xong
-    _startSubscriptions(handleStoreChange);
-  }, 1500);
+  };
+
+  if (window.requestIdleCallback) {
+    window.requestIdleCallback(() => void refreshFromSheets(), { timeout: 5000 });
+  } else {
+    window.setTimeout(() => void refreshFromSheets(), 2500);
+  }
 }
 
 function _startSubscriptions(handleStoreChange: () => void) {

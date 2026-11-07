@@ -96,10 +96,10 @@ export function Drawer({
       }
     };
     document.addEventListener('keydown', onKey);
-    const timer = setTimeout(() => panelRef.current?.focus(), 100);
+    const timer = requestAnimationFrame(() => panelRef.current?.focus({ preventScroll: true }));
     return () => {
       document.removeEventListener('keydown', onKey);
-      clearTimeout(timer);
+      cancelAnimationFrame(timer);
     };
   }, [onClose]);
 
@@ -197,7 +197,8 @@ export function Drawer({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 bg-black/20 backdrop-blur-md"
+        transition={{ duration: 0.12 }}
+        className="fixed inset-0 bg-black/25"
         style={{ zIndex: zBackdrop }}
       />
       {isModal ? (
@@ -206,10 +207,10 @@ export function Drawer({
           style={{ zIndex: zPanel }}
         >
           <motion.div
-            initial={fullscreenModal ? { opacity: 0, y: 20 } : { opacity: 0, scale: 0.9, y: 30 }}
+            initial={fullscreenModal ? { opacity: 0, y: 8 } : { opacity: 0, scale: 0.98, y: 8 }}
             animate={fullscreenModal ? { opacity: 1, y: 0 } : { opacity: 1, scale: 1, y: 0 }}
-            exit={fullscreenModal ? { opacity: 0, y: 20 } : { opacity: 0, scale: 0.9, y: 30 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            exit={fullscreenModal ? { opacity: 0, y: 8 } : { opacity: 0, scale: 0.98, y: 8 }}
+            transition={{ duration: 0.14, ease: 'easeOut' }}
             className={`w-full bg-card shadow-ultra flex flex-col pointer-events-auto border border-border/40 outline-none ${fullscreenModal ? 'h-full min-h-[100dvh] max-h-none rounded-none' : `${widthCls} max-h-[90vh] rounded-2xl`}`}
             ref={panelRef}
             role="dialog"
@@ -225,7 +226,7 @@ export function Drawer({
           initial={{ x: '100%' }}
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
-          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          transition={{ duration: 0.16, ease: 'easeOut' }}
           className={`fixed inset-y-0 right-0 w-full ${widthCls} bg-card shadow-ultra flex flex-col h-[100dvh] border-l border-border/40 outline-none`}
           style={{ zIndex: zPanel }}
           ref={panelRef}

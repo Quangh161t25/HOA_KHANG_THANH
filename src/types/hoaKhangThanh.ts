@@ -149,6 +149,10 @@ export interface InventoryItem {
   shelfLifeDays: number;
   freshness: string;
   status: 'normal' | 'low' | 'out' | 'excess';
+  openingStock?: number;
+  importStock?: number;
+  exportStock?: number;
+  closingStock?: number;
 }
 
 export interface StockTransaction {

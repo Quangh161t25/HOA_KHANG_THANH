@@ -433,7 +433,10 @@ export default function DonHangPage() {
             </button>
             <button
               type="button"
-              onClick={() => handleEdit(enrichedRow)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEdit(enrichedRow);
+              }}
               className="p-1 rounded text-primary hover:bg-primary/10 transition-colors"
               title="Chỉnh sửa đơn hàng"
             >
@@ -441,7 +444,10 @@ export default function DonHangPage() {
             </button>
             <button
               type="button"
-              onClick={() => handleDelete(row)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(row);
+              }}
               className="p-1 rounded text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
               title="Xóa đơn hàng"
             >

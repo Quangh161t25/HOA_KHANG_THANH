@@ -16,6 +16,7 @@ import { NotificationBell } from './NotificationBell';
 import { MobileBottomNav } from './MobileBottomNav';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { GoogleSheetsHeaderButton } from '@/components/google-sheets/GoogleSheetsHeaderButton';
+import { preloadRoute } from '@/modules/routeLoaders';
 
 const SIDEBAR_OPEN = 240;
 const SIDEBAR_CLOSED = 64;
@@ -147,11 +148,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
                       if (isMobile && sidebarOpen) toggleSidebar();
                     }}
                     onMouseEnter={(e) => {
+                      void preloadRoute(item.path);
                       if (!sidebarOpen) {
                         const r = e.currentTarget.getBoundingClientRect();
                         setTip({ name, top: r.top + r.height / 2, left: r.right });
                       }
                     }}
+                    onPointerDown={() => void preloadRoute(item.path)}
                     onMouseLeave={() => setTip(null)}
                     className={({ isActive }) =>
                       cn(

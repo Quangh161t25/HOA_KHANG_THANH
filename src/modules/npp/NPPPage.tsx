@@ -721,12 +721,14 @@ export default function NPPPage() {
         </div>
       )}
 
-      <NPPDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        distributor={selectedDistributor}
-        mode={drawerMode}
-      />
+      {isDrawerOpen && (
+        <NPPDrawer
+          isOpen
+          onClose={() => setIsDrawerOpen(false)}
+          distributor={selectedDistributor}
+          mode={drawerMode}
+        />
+      )}
     </div>
   );
 }

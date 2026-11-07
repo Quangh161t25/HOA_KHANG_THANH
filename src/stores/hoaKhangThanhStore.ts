@@ -18,6 +18,52 @@ import type {
 import { toInputDate, todayISODate } from '@/lib/format';
 import { recordOrderAudit } from './orderLogStore';
 
+function orderBusinessKey(order: Order) {
+  return JSON.stringify([
+    order.code?.trim().toLowerCase(),
+    order.orderDate,
+    order.distributorName?.trim().toLowerCase(),
+    order.phone || '',
+    order.totalAmount || 0,
+    order.paidAmount || 0,
+    order.items || [],
+  ]);
+}
+
+/**
+ * Dọn dữ liệu đơn cũ: bỏ dòng trùng hoàn toàn, đồng thời bảo đảm mã và id không trùng.
+ * ID trùng khiến React tái sử dụng sai dòng và các hàm sửa/xóa tác động nhiều đơn cùng lúc.
+ */
+export function normalizeOrders(input: Order[]): Order[] {
+  const seenRows = new Set<string>();
+  const usedIds = new Set<string>();
+  const usedCodes = new Set<string>();
+
+  return input.flatMap((source, index) => {
+    const rowKey = orderBusinessKey(source);
+    if (seenRows.has(rowKey)) return [];
+    seenRows.add(rowKey);
+
+    const baseCode = source.code?.trim() || `DH-${index + 1}`;
+    let code = baseCode;
+    let codeSuffix = 2;
+    while (usedCodes.has(code.toLowerCase())) {
+      code = `${baseCode}-${codeSuffix++}`;
+    }
+    usedCodes.add(code.toLowerCase());
+
+    const slug = code.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || String(index + 1);
+    let id = source.id?.trim() || `dh-${slug}`;
+    let idSuffix = 2;
+    while (usedIds.has(id)) {
+      id = `dh-${slug}-${idSuffix++}`;
+    }
+    usedIds.add(id);
+
+    return [{ ...source, id, code }];
+  });
+}
+
 // --- Flower Store ---
 interface FlowerState {
   flowers: Flower[];
@@ -332,7 +378,17 @@ export const useOrderStore = create<OrderState>()(
         }),
       resetOrders: () => set({ orders: [] }),
     }),
-    { name: 'hkt-orders-storage' },
+    {
+      name: 'hkt-orders-storage',
+      merge: (persisted, current) => {
+        const saved = persisted as Partial<OrderState>;
+        return {
+          ...current,
+          ...saved,
+          orders: normalizeOrders(saved.orders || current.orders),
+        };
+      },
+    },
   ),
 );
 
@@ -351,21 +407,45 @@ export const useInventoryStore = create<InventoryState>()(
       inventory: [],
       importStock: (flowerId, quantity, warehouse, unitPrice, supplierName) =>
         set((state) => {
-          const updated = state.inventory.map((item) => {
-            if (item.flowerId !== flowerId) return item;
-            const newStock = item.currentStock + quantity;
-            return {
-              ...item,
-              warehouse: warehouse || item.warehouse,
-              currentStock: newStock,
-              status: (newStock <= item.minStock ? 'low' : newStock === 0 ? 'out' : 'normal') as InventoryItem['status'],
+          const fl = useFlowerStore.getState().flowers.find((f) => f.id === flowerId);
+          const exists = state.inventory.some((i) => i.flowerId === flowerId);
+          let updated: InventoryItem[];
+          if (!exists) {
+            const newItem: InventoryItem = {
+              flowerId,
+              flowerCode: fl?.code || `FL-${Date.now().toString().slice(-4)}`,
+              flowerName: fl?.name || 'Hoa tươi',
+              category: fl?.category || 'Hoa tươi',
+              unit: fl?.unit || 'cành',
+              warehouse: warehouse || 'Kho mát',
+              currentStock: (fl?.stock || 0) + quantity,
+              minStock: 50,
+              maxStock: 500,
+              costPrice: unitPrice || fl?.costPrice || 0,
               lastImportDate: new Date().toISOString().split('T')[0],
+              shelfLifeDays: 7,
               freshness: 'Tươi mới 100% (Mới nhập hôm nay)',
+              status: 'normal',
+              importStock: quantity,
             };
-          });
+            updated = [...state.inventory, newItem];
+          } else {
+            updated = state.inventory.map((item) => {
+              if (item.flowerId !== flowerId) return item;
+              const newStock = item.currentStock + quantity;
+              return {
+                ...item,
+                warehouse: warehouse || item.warehouse,
+                currentStock: newStock,
+                importStock: (item.importStock || 0) + quantity,
+                status: (newStock <= item.minStock ? 'low' : newStock === 0 ? 'out' : 'normal') as InventoryItem['status'],
+                lastImportDate: new Date().toISOString().split('T')[0],
+                freshness: 'Tươi mới 100% (Mới nhập hôm nay)',
+              };
+            });
+          }
 
           // Update Flower stock as well
-          const fl = useFlowerStore.getState().flowers.find((f) => f.id === flowerId);
           if (fl) {
             useFlowerStore.getState().updateStock(flowerId, fl.stock + quantity);
           }
@@ -389,18 +469,43 @@ export const useInventoryStore = create<InventoryState>()(
         }),
       exportStock: (flowerId, quantity, reason, _notes) =>
         set((state) => {
-          const updated = state.inventory.map((item) => {
-            if (item.flowerId !== flowerId) return item;
-            const newStock = Math.max(0, item.currentStock - quantity);
-            return {
-              ...item,
-              currentStock: newStock,
-              status: (newStock === 0 ? 'out' : newStock <= item.minStock ? 'low' : 'normal') as InventoryItem['status'],
+          const fl = useFlowerStore.getState().flowers.find((f) => f.id === flowerId);
+          const exists = state.inventory.some((i) => i.flowerId === flowerId);
+          let updated: InventoryItem[];
+          if (!exists) {
+            const currentStock = Math.max(0, (fl?.stock || 0) - quantity);
+            const newItem: InventoryItem = {
+              flowerId,
+              flowerCode: fl?.code || `FL-${Date.now().toString().slice(-4)}`,
+              flowerName: fl?.name || 'Hoa tươi',
+              category: fl?.category || 'Hoa tươi',
+              unit: fl?.unit || 'cành',
+              warehouse: 'Kho mát',
+              currentStock,
+              minStock: 50,
+              maxStock: 500,
+              costPrice: fl?.costPrice || 0,
+              lastImportDate: '',
+              shelfLifeDays: 7,
+              freshness: 'Tươi mới',
+              status: (currentStock === 0 ? 'out' : 'normal') as InventoryItem['status'],
+              exportStock: quantity,
             };
-          });
+            updated = [...state.inventory, newItem];
+          } else {
+            updated = state.inventory.map((item) => {
+              if (item.flowerId !== flowerId) return item;
+              const newStock = Math.max(0, item.currentStock - quantity);
+              return {
+                ...item,
+                currentStock: newStock,
+                exportStock: (item.exportStock || 0) + quantity,
+                status: (newStock === 0 ? 'out' : newStock <= item.minStock ? 'low' : 'normal') as InventoryItem['status'],
+              };
+            });
+          }
 
-          if (reason === 'damage') {
-            const fl = useFlowerStore.getState().flowers.find((f) => f.id === flowerId);
+          if (reason === 'damage' || reason === 'order' || reason === 'adjust') {
             if (fl) {
               useFlowerStore.getState().updateStock(flowerId, Math.max(0, fl.stock - quantity));
             }
@@ -409,9 +514,33 @@ export const useInventoryStore = create<InventoryState>()(
           return { inventory: updated };
         }),
       updateInventoryItem: (flowerId, updates) =>
-        set((state) => ({
-          inventory: state.inventory.map((i) => (i.flowerId === flowerId ? { ...i, ...updates } : i)),
-        })),
+        set((state) => {
+          const exists = state.inventory.some((i) => i.flowerId === flowerId);
+          if (!exists) {
+            const fl = useFlowerStore.getState().flowers.find((f) => f.id === flowerId);
+            const newItem: InventoryItem = {
+              flowerId,
+              flowerCode: fl?.code || `FL-${Date.now().toString().slice(-4)}`,
+              flowerName: fl?.name || 'Hoa tươi',
+              category: fl?.category || 'Hoa tươi',
+              unit: fl?.unit || 'cành',
+              warehouse: 'Kho mát',
+              currentStock: fl?.stock || 0,
+              minStock: 50,
+              maxStock: 500,
+              costPrice: fl?.costPrice || 0,
+              lastImportDate: '',
+              shelfLifeDays: 7,
+              freshness: 'Tươi mới',
+              status: 'normal',
+              ...updates,
+            };
+            return { inventory: [...state.inventory, newItem] };
+          }
+          return {
+            inventory: state.inventory.map((i) => (i.flowerId === flowerId ? { ...i, ...updates } : i)),
+          };
+        }),
       resetInventory: () => set({ inventory: [] }),
     }),
     { name: 'hkt-inventory-storage' },

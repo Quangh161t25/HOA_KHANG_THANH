@@ -146,6 +146,8 @@ export interface DataTableProps<T> {
   emptyDescription?: string;
   emptyAction?: ReactNode;
   renderSummaryRow?: (columnId: string, data: T[]) => ReactNode;
+  hideActions?: boolean;
+  showIndex?: boolean;
 }
 
 /** Bảng dữ liệu dùng chung (desktop: bảng có cột dính; mobile: danh sách thẻ). */
@@ -261,7 +263,10 @@ export function DataTable<T>({
   emptyDescription,
   emptyAction,
   renderSummaryRow,
+  hideActions,
+  showIndex,
 }: DataTableProps<T>) {
+  const hasActions = hideActions !== undefined ? !hideActions : columns.some((c) => c.id === 'actions');
   const visible = useMemo(() => [...columns].filter((c) => c.visible).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)), [columns]);
   const hasExplicitPinned = useMemo(() => columns.some((c) => c.pinned === true), [columns]);
 
@@ -282,7 +287,7 @@ export function DataTable<T>({
   }, [visible, hasExplicitPinned, stickyLeftCount]);
 
   const tableMinWidth = useMemo(
-    () => CHECK_COL + dataCols.reduce((sum, c) => sum + (c.width ?? c.minWidth ?? DEFAULT_COL), 0) + ACTION_COL,
+    () => CHECK_COL + dataCols.reduce((sum, c) => sum + (c.width ?? c.minWidth ?? DEFAULT_COL), 0) + (hasActions ? ACTION_COL : 0),
     [dataCols],
   );
 
@@ -528,27 +533,33 @@ export function DataTable<T>({
                       </th>
                     );
                   })}
-                  <th className="sticky right-0 z-[3] px-3 py-1.5 bg-muted border-b border-l border-border/80 text-center" style={{ width: ACTION_COL }}>
-                    {renderSummaryRow('actions', data)}
-                  </th>
+                  {hasActions && (
+                    <th className="sticky right-0 z-[3] px-3 py-1.5 bg-muted border-b border-l border-border/80 text-center" style={{ width: ACTION_COL }}>
+                      {renderSummaryRow('actions', data)}
+                    </th>
+                  )}
                 </tr>
               )}
               <tr className="bg-muted border-b border-border">
                 <th
-                  className="sticky left-0 z-[3] px-3 py-2 bg-muted border-b border-r border-border text-center"
+                  className="sticky left-0 z-[3] px-2 py-2 bg-muted border-b border-r border-border text-center text-xs font-semibold text-foreground/70"
                   style={{ width: CHECK_COL, minWidth: CHECK_COL, maxWidth: CHECK_COL }}
                 >
-                  <div className="flex items-center justify-center">
-                    <input
-                      type="checkbox"
-                      checked={allChecked}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someChecked;
-                      }}
-                      onChange={() => onToggleAll(pageIds)}
-                      className="w-4 h-4 rounded border-border text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer accent-primary transition-all"
-                    />
-                  </div>
+                  {showIndex ? (
+                    <span>STT</span>
+                  ) : (
+                    <div className="flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={allChecked}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someChecked;
+                        }}
+                        onChange={() => onToggleAll(pageIds)}
+                        className="w-4 h-4 rounded border-border text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer accent-primary transition-all"
+                      />
+                    </div>
+                  )}
                 </th>
                 {dataCols.map((c) => {
                   const isSticky = stickyLeftMap.has(c.id);
@@ -612,23 +623,25 @@ export function DataTable<T>({
                     </th>
                   );
                 })}
-                <th
-                  className="sticky right-0 z-[3] px-3 py-2 bg-muted border-b border-l border-border text-center font-semibold text-foreground/80 text-xs"
-                  style={{ width: ACTION_COL }}
-                >
-                  Thao tác
-                </th>
+                {hasActions && (
+                  <th
+                    className="sticky right-0 z-[3] px-3 py-2 bg-muted border-b border-l border-border text-center font-semibold text-foreground/80 text-xs"
+                    style={{ width: ACTION_COL }}
+                  >
+                    Thao tác
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
               {data.length === 0 ? (
                 <tr>
-                  <td colSpan={dataCols.length + 2} className="py-16 text-center bg-card">
+                  <td colSpan={dataCols.length + 1 + (hasActions ? 1 : 0)} className="py-16 text-center bg-card">
                     <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
                   </td>
                 </tr>
               ) : (
-                pageRows.map((row) => {
+                pageRows.map((row, index) => {
                   const id = keyExtractor(row);
                   const selected = selectedIds.has(id);
                   const rowCls = selected ? 'bg-primary/[0.03] hover:bg-primary/[0.06]' : 'bg-card even:bg-muted/15 hover:bg-accent transition-all duration-150';
@@ -636,18 +649,24 @@ export function DataTable<T>({
                   return (
                     <tr key={id} onClick={() => onRowClick?.(row)} className={`group cursor-pointer ${rowCls} [&>td]:border-b [&>td]:border-border`}>
                       <td
-                        className={`sticky left-0 z-[1] px-3 ${py} border-r border-border text-center ${stickyCls}`}
+                        className={`sticky left-0 z-[1] px-2 ${py} border-r border-border text-center ${stickyCls}`}
                         style={{ width: CHECK_COL, minWidth: CHECK_COL, maxWidth: CHECK_COL }}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="flex items-center justify-center">
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => onToggleSelection(id)}
-                            className="w-4 h-4 rounded border-border text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer accent-primary transition-all"
-                          />
-                        </div>
+                        {showIndex ? (
+                          <span className="text-xs font-medium text-muted-foreground tabular-nums">
+                            {(page - 1) * pageSize + index + 1}
+                          </span>
+                        ) : (
+                          <div className="flex items-center justify-center">
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => onToggleSelection(id)}
+                              className="w-4 h-4 rounded border-border text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer accent-primary transition-all"
+                            />
+                          </div>
+                        )}
                       </td>
                       {dataCols.map((c) => {
                         const isSticky = stickyLeftMap.has(c.id);
@@ -680,9 +699,11 @@ export function DataTable<T>({
                           </td>
                         );
                       })}
-                      <td className={`sticky right-0 z-[1] px-2 ${py} border-l border-border/50 text-center ${stickyCls}`} onClick={(e) => e.stopPropagation()}>
-                        {renderCell('actions', row)}
-                      </td>
+                      {hasActions && (
+                        <td className={`sticky right-0 z-[1] px-2 ${py} border-l border-border/50 text-center ${stickyCls}`} onClick={(e) => e.stopPropagation()}>
+                          {renderCell('actions', row)}
+                        </td>
+                      )}
                     </tr>
                   );
                 })

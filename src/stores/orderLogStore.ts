@@ -169,7 +169,7 @@ export const useOrderLogStore = create<OrderLogState>()(
             id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             timestamp: logInput.timestamp || new Date().toISOString(),
           };
-          return { logs: [newLog, ...state.logs] };
+          return { logs: [newLog, ...state.logs].slice(0, 500) };
         }),
       deleteLog: (id) =>
         set((state) => ({ logs: state.logs.filter((l) => l.id !== id) })),
