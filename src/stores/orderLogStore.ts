@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { idbJSONStorage } from '@/lib/idbStorage';
 import type { Order, OrderAuditAction, OrderAuditDiff, OrderAuditLog } from '@/types/hoaKhangThanh';
 import { useAuthStore } from './auth';
 
@@ -176,7 +177,7 @@ export const useOrderLogStore = create<OrderLogState>()(
       clearLogs: () => set({ logs: [] }),
       resetLogs: () => set({ logs: [] }),
     }),
-    { name: 'hkt-order-audit-logs-storage' },
+    { name: 'hkt-order-audit-logs-storage', storage: idbJSONStorage },
   ),
 );
 

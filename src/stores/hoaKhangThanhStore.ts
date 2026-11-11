@@ -2,6 +2,7 @@ import { computeAllOrdersVirtualDebt } from '@/lib/orderDebtHelper';
 import { watchModule } from './moduleAuditStore';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { idbJSONStorage } from '@/lib/idbStorage';
 import type {
   Flower,
   Supplier,
@@ -104,7 +105,7 @@ export const useFlowerStore = create<FlowerState>()(
         })),
       resetFlowers: () => set({ flowers: [] }),
     }),
-    { name: 'hkt-flowers-storage' },
+    { name: 'hkt-flowers-storage', storage: idbJSONStorage },
   ),
 );
 
@@ -135,7 +136,7 @@ export const useSupplierStore = create<SupplierState>()(
         })),
       resetSuppliers: () => set({ suppliers: [] }),
     }),
-    { name: 'hkt-suppliers-storage' },
+    { name: 'hkt-suppliers-storage', storage: idbJSONStorage },
   ),
 );
 
@@ -166,7 +167,7 @@ export const useDistributorStore = create<DistributorState>()(
         })),
       resetDistributors: () => set({ distributors: [] }),
     }),
-    { name: 'hkt-distributors-storage' },
+    { name: 'hkt-distributors-storage', storage: idbJSONStorage },
   ),
 );
 
@@ -380,6 +381,7 @@ export const useOrderStore = create<OrderState>()(
     }),
     {
       name: 'hkt-orders-storage',
+      storage: idbJSONStorage,
       merge: (persisted, current) => {
         const saved = persisted as Partial<OrderState>;
         return {
@@ -543,7 +545,7 @@ export const useInventoryStore = create<InventoryState>()(
         }),
       resetInventory: () => set({ inventory: [] }),
     }),
-    { name: 'hkt-inventory-storage' },
+    { name: 'hkt-inventory-storage', storage: idbJSONStorage },
   ),
 );
 
@@ -574,7 +576,7 @@ export const useEmployeeStore = create<EmployeeState>()(
         })),
       resetEmployees: () => set({ employees: [] }),
     }),
-    { name: 'hkt-employees-storage' },
+    { name: 'hkt-employees-storage', storage: idbJSONStorage },
   ),
 );
 
@@ -605,7 +607,7 @@ export const useCashStore = create<CashState>()(
         })),
       resetTransactions: () => set({ transactions: [] }),
     }),
-    { name: 'hkt-cash-storage' },
+    { name: 'hkt-cash-storage', storage: idbJSONStorage },
   ),
 );
 
@@ -711,7 +713,7 @@ export const useDebtStore = create<DebtState>()(
         }),
       resetRecords: () => set({ records: [] }),
     }),
-    { name: 'hkt-debt-records-storage' },
+    { name: 'hkt-debt-records-storage', storage: idbJSONStorage },
   ),
 );
 
@@ -742,7 +744,7 @@ export const useFixedExpenseStore = create<FixedExpenseState>()(
         })),
       resetPresets: () => set({ presets: [] }),
     }),
-    { name: 'hkt-fixed-expenses-storage' },
+    { name: 'hkt-fixed-expenses-storage', storage: idbJSONStorage },
   ),
 );
 
@@ -879,7 +881,7 @@ export const useSupplierOrderStore = create<SupplierOrderState>()(
         }),
       resetOrders: () => set({ orders: [] }),
     }),
-    { name: 'hkt-supplier-orders-storage' },
+    { name: 'hkt-supplier-orders-storage', storage: idbJSONStorage },
   ),
 );
 
@@ -1260,11 +1262,16 @@ export function syncAllOrdersToDebtRecords() {
   const supOrderStore = useSupplierOrderStore.getState();
   const debtStore = useDebtStore.getState();
 
+  // Tra cứu O(1) thay vì quét toàn bộ công nợ cho từng đơn
+  const debtKeys = new Set<string>();
+  debtStore.records.forEach((r) => {
+    if (r.referenceCode) debtKeys.add(r.referenceCode);
+    debtKeys.add(r.id);
+  });
+
   // Đơn hàng bán
   orderStore.orders.forEach((o) => {
-    const hasRecord = debtStore.records.some(
-      (r) => r.referenceCode === o.code || r.id === `debt-dh-${o.id}`,
-    );
+    const hasRecord = debtKeys.has(o.code) || debtKeys.has(`debt-dh-${o.id}`);
     if (!hasRecord) {
       syncOrderToDebt(o);
     }
@@ -1272,9 +1279,7 @@ export function syncAllOrdersToDebtRecords() {
 
   // Đơn nhập NCC
   supOrderStore.orders.forEach((po) => {
-    const hasRecord = debtStore.records.some(
-      (r) => r.referenceCode === po.code || r.id === `debt-ncc-${po.id}`,
-    );
+    const hasRecord = debtKeys.has(po.code) || debtKeys.has(`debt-ncc-${po.id}`);
     if (!hasRecord) {
       syncSupplierOrderToDebt(po);
     }
@@ -1324,12 +1329,8 @@ if (typeof window !== 'undefined' && localStorage.getItem('hkt-debts-cleared-cle
   clearAllDebtAndOrderData();
 }
 
-// Tự động đồng bộ các đơn hàng vào bản ghi công nợ
-if (typeof window !== 'undefined') {
-  setTimeout(() => {
-    syncAllOrdersToDebtRecords();
-  }, 150);
-}
+// Không tự chạy syncAllOrdersToDebtRecords lúc khởi động: công nợ lấy từ Google Sheets làm chuẩn,
+// và bản ghi từ Sheets không có referenceCode nên việc đồng bộ lại toàn bộ đơn gây treo trang.
 
 // Register once, after persisted stores and startup migrations are initialized.
 watchModule(useFlowerStore, (state) => state.flowers, 'hoa', (row) => row.id);

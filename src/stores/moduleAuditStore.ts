@@ -1,5 +1,6 @@
 import { create, type StoreApi } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { idbJSONStorage } from '@/lib/idbStorage';
 import { useAuthStore } from './auth';
 
 export type AuditModule = 'hoa' | 'ncc' | 'npp' | 'don-hang-ncc' | 'ton-kho' | 'nhan-vien' | 'thu-chi' | 'cong-no';
@@ -29,7 +30,7 @@ export const useModuleAuditStore = create<{ logs: ModuleAuditLog[]; append: (log
   persist((set) => ({
     logs: [],
     append: (logs) => set((state) => ({ logs: [...logs, ...state.logs].slice(0, 500) })),
-  }), { name: 'hkt-module-audit-storage' }),
+  }), { name: 'hkt-module-audit-storage', storage: idbJSONStorage }),
 );
 
 const labels: Record<string, string> = {
@@ -66,6 +67,9 @@ function display(value: unknown): string {
 export function watchModule<S, T extends object>(store: StoreApi<S>, select: (state: S) => T[], module: AuditModule, key: (row: T) => string) {
   return store.subscribe((state, previous) => {
     if (auditPauseDepth > 0) return;
+    // Bỏ qua lần nạp dữ liệu từ IndexedDB (nạp bất đồng bộ), tránh ghi nhầm toàn bộ dữ liệu là "Thêm mới"
+    const persistApi = (store as unknown as { persist?: { hasHydrated: () => boolean } }).persist;
+    if (persistApi && !persistApi.hasHydrated()) return;
     const rows = select(state);
     const oldRows = select(previous);
     if (rows === oldRows) return;

@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { GOOGLE_SHEETS_CONFIG } from '../config/googleSheetsConfig.js';
+import { toSheetDate, toSheetDateTime } from '../lib/sheetDate.js';
 
 const { spreadsheetId, serviceAccount } = GOOGLE_SHEETS_CONFIG;
 
@@ -170,7 +171,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
 
           return [
             o.code || '',
-            o.orderDate || '',
+            toSheetDate(o.orderDate),
             o.distributorName || '',
             o.phone || '',
             o.address || '',
@@ -187,7 +188,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
             o.paymentStatus || '',
             o.creator || '',
             o.notes || '',
-            new Date().toLocaleString('vi-VN'),
+            toSheetDateTime(),
           ];
         });
 
@@ -203,7 +204,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
           (o.items || []).forEach((item: any) => {
             detailRows.push([
               o.code || '',
-              o.orderDate || '',
+              toSheetDate(o.orderDate),
               o.distributorName || '',
               item.flowerCode || '',
               item.flowerName || '',
@@ -254,7 +255,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
           d.totalRevenue || 0,
           d.collectedAmount || 0,
           d.currentDebt ?? ((d.oldDebt || 0) + (d.totalRevenue || 0) - (d.collectedAmount || 0)),
-          d.lastOrderDate || '',
+          toSheetDate(d.lastOrderDate),
           d.daysSinceLastOrder ? `${d.daysSinceLastOrder} ngày` : '',
           d.isOverdue ? '⚠️ Quá hạn' : 'Bình thường',
           d.status || 'Hoạt động',
@@ -290,7 +291,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
       if (body.supplierOrders) {
         const rows = body.supplierOrders.map((so) => [
           so.code || '',
-          so.orderDate || '',
+          toSheetDate(so.orderDate),
           so.supplierName || '',
           so.totalQuantity || (so.items || []).reduce((sum: number, i: any) => sum + (i.quantity || 0), 0),
           so.totalAmount || 0,
@@ -311,7 +312,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
       // 7. CONG_NO
       if (body.debtRecords) {
         const rows = body.debtRecords.map((r) => [
-          r.date || '',
+          toSheetDate(r.date),
           r.partnerName || '',
           r.partnerType === 'npp' ? 'NPP' : 'NCC',
           r.type || r.entryType || '',
@@ -331,7 +332,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
       if (body.transactions) {
         const rows = body.transactions.map((t) => [
           t.code || '',
-          t.date || '',
+          toSheetDate(t.date),
           t.type === 'income' ? 'Thu' : 'Chi',
           t.category || '',
           t.amount || 0,
@@ -358,7 +359,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
           inv.costPrice || 0,
           inv.status === 'out' ? '🚫 Hết hàng' : inv.status === 'low' ? '⚠️ Sắp hết' : inv.status === 'excess' ? '📦 Dư hàng' : 'Đủ hàng',
           inv.warehouse || 'Kho mát',
-          inv.lastImportDate || '',
+          toSheetDate(inv.lastImportDate),
           inv.freshness || '',
         ]);
         batchData.push({
@@ -378,7 +379,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
           e.role === 'admin' ? 'Quản trị viên' : 'Nhân viên',
           e.phone || '',
           e.email || '',
-          e.joinDate || '',
+          toSheetDate(e.joinDate),
           e.salary || 0,
           e.status || 'Đang làm việc',
           e.password || '123456',
@@ -393,7 +394,7 @@ export async function googleSheetsHandler(req: IncomingMessage & { body?: unknow
       if (body.auditLogs) {
         const rows = body.auditLogs.map((l) => [
           l.id || '',
-          l.timestamp ? new Date(l.timestamp).toLocaleString('vi-VN') : '',
+          l.timestamp ? toSheetDateTime(l.timestamp) : '',
           l.performerName || '',
           l.performerCode || '',
           l.performerRole || '',

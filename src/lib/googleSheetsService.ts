@@ -1,5 +1,6 @@
 import { actionLabels, pauseModuleAudit, useModuleAuditStore } from '@/stores/moduleAuditStore';
 import { GOOGLE_SHEETS_CONFIG } from '@/config/googleSheetsConfig';
+import { fromSheetDate } from '@/lib/sheetDate';
 import {
   useCashStore,
   useDebtStore,
@@ -344,7 +345,7 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
           role: (r[5] === 'Quản trị viên' ? 'admin' : 'member') as Employee['role'],
           phone: String(r[6] || '').trim(),
           email: String(r[7] || '').trim(),
-          joinDate: String(r[8] || '').trim(),
+          joinDate: fromSheetDate(r[8]),
           salary: parseSheetNumber(r[9]) || 0,
           status: 'active' as Employee['status'],
           password: (r[11] ? String(r[11]).trim() : undefined) || prev?.password || '123456',
@@ -375,7 +376,7 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
           minStock,
           maxStock,
           costPrice: parseSheetNumber(r[6]) || 0,
-          lastImportDate: String(r[9] || '').trim(),
+          lastImportDate: fromSheetDate(r[9]),
           shelfLifeDays: 7,
           freshness: String(r[10] || '').trim(),
           status,
@@ -392,7 +393,7 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
       const transactions: CashTransaction[] = thuChiRows.filter((r) => r[0] && r[1]).map((r, idx) => ({
         id: `tc-sync-${idx + 1}`,
         code: String(r[0] || '').trim(),
-        date: String(r[1] || '').trim(),
+        date: fromSheetDate(r[1]),
         type: (r[2] === 'Thu' ? 'income' : 'expense') as CashTransaction['type'],
         category: String(r[3] || '').trim(),
         amount: parseSheetNumber(r[4]) || 0,
@@ -424,7 +425,7 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
 
         return {
           id: `cn-sync-${idx + 1}`,
-          date: String(r[0] || '').trim(),
+          date: fromSheetDate(r[0]),
           partnerType,
           partnerId: matchedDist?.id || matchedSup?.id || `partner-sync-${idx + 1}`,
           partnerCode: matchedDist?.code || matchedSup?.code || '',
@@ -511,7 +512,7 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
         return {
           id: prev?.id || `dh-sync-${idx + 1}`,
           code,
-          orderDate: String(r[1] || '').trim(),
+          orderDate: fromSheetDate(r[1]),
           distributorName: String(r[2] || '').trim(),
           phone: String(r[3] || '').trim() || prev?.phone || '',
                     address: String(r[4] || '').trim() || prev?.address || '',
@@ -548,7 +549,7 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
         return {
           id: prev?.id || `po-sync-${idx + 1}`,
           code,
-          orderDate: String(r[1] || '').trim(),
+          orderDate: fromSheetDate(r[1]),
           supplierName: String(r[2] || '').trim(),
           totalQuantity: parseSheetNumber(r[3]) || prev?.totalQuantity || 0,
           itemsSubtotal: parseSheetNumber(r[4]) || prev?.itemsSubtotal || 0,
