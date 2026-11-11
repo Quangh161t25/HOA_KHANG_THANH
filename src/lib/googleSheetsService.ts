@@ -12,6 +12,7 @@ import {
   useOrderStore,
   useSupplierOrderStore,
   useSupplierStore,
+  syncAllOrdersToDebtRecords,
   recalcAllDistributorsDebts,
   recalcAllSuppliersDebts,
 } from '@/stores/hoaKhangThanhStore';
@@ -576,6 +577,9 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
       useSupplierOrderStore.setState({ orders: supplierOrders });
       counts['don_nhap_ncc'] = supplierOrders.length;
     }
+
+    // Tự động đồng bộ toàn bộ đơn hàng vào sổ công nợ (có đơn thì có công nợ)
+    syncAllOrdersToDebtRecords();
 
     // Tự động tính toán lại toàn bộ doanh số bán hoa, công nợ cũ, đã trả, nợ cuối cho NPP & NCC
     recalcAllDistributorsDebts();

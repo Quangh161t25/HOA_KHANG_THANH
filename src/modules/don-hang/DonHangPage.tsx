@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Building2,
@@ -20,7 +20,12 @@ import { ListToolbar } from '@/components/data/ListToolbar';
 import { DataTable } from '@/components/data/DataTable';
 import { MultiSelectFilter, type FilterOption } from '@/components/ui/MultiSelectFilter';
 import type { ColumnDef } from '@/stores/createListStore';
-import { useDebtStore, useDistributorStore, useOrderStore } from '@/stores/hoaKhangThanhStore';
+import {
+  syncAllOrdersToDebtRecords,
+  useDebtStore,
+  useDistributorStore,
+  useOrderStore,
+} from '@/stores/hoaKhangThanhStore';
 import type { Order } from '@/types/hoaKhangThanh';
 import { formatDate, parseDateTimestamp } from '@/lib/format';
 import { checkCustomerOverdueDebt } from '@/lib/debtCheck';
@@ -53,6 +58,11 @@ export default function DonHangPage() {
   const { orders, deleteOrder } = useOrderStore();
   const debtRecords = useDebtStore((s) => s.records);
   const distributors = useDistributorStore((s) => s.distributors);
+
+  // Tự động kiểm tra và đồng bộ đơn hàng sang sổ công nợ
+  useEffect(() => {
+    syncAllOrdersToDebtRecords();
+  }, []);
 
   // Cột ảo: Tự động tính toán công nợ cũ & thanh toán theo dòng thời gian lũy kế thực tế
   const virtualDebtMap = useMemo(() => {

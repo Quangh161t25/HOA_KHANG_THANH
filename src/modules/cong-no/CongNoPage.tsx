@@ -1,6 +1,6 @@
 import { History } from 'lucide-react';
 import { ModuleHistory } from '@/components/data/ModuleHistory';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -11,6 +11,7 @@ import {
   Package,
   Plus,
   Receipt,
+  RefreshCw,
   RotateCcw,
   SquarePen,
   Store,
@@ -26,6 +27,7 @@ import { DataTable } from '@/components/data/DataTable';
 import type { ColumnDef } from '@/stores/createListStore';
 import {
   clearAllDebtAndOrderData,
+  syncAllOrdersToDebtRecords,
   useDebtStore,
   useDistributorStore,
   useSupplierStore,
@@ -106,6 +108,20 @@ export default function CongNoPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedRecord, setSelectedRecord] = useState<DebtDailyRecord | null>(null);
+
+  // Tự động kiểm tra và đồng bộ đơn hàng sang sổ công nợ khi mở trang: có đơn thì công nợ tự động có dữ liệu
+  useEffect(() => {
+    syncAllOrdersToDebtRecords();
+  }, []);
+
+  const handleSyncFromOrders = () => {
+    const res = syncAllOrdersToDebtRecords();
+    if (res.newAdded > 0) {
+      toast.success(`Đã đồng bộ tự động ${res.newAdded} đơn hàng mới vào sổ công nợ!`);
+    } else {
+      toast.success(`Tất cả đơn hàng (${res.syncedNPP} đơn bán, ${res.syncedNCC} đơn nhập) đã được đồng bộ chuẩn xác với sổ công nợ.`);
+    }
+  };
 
   // Switch columns when tab changes
   const handleTabChange = (tab: Tab) => {
@@ -853,6 +869,16 @@ export default function CongNoPage() {
               className="gap-1.5 text-xs h-8"
             >
               <Download size={14} /> Xuất Excel
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleSyncFromOrders}
+              className="gap-1.5 text-xs h-8 text-primary border-primary/40 hover:bg-primary/10"
+              title="Đồng bộ tự động các đơn hàng hiện có vào sổ công nợ"
+            >
+              <RefreshCw size={13} /> Đồng bộ từ đơn hàng
             </Button>
             <Button
               type="button"

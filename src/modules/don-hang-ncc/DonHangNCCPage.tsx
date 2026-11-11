@@ -1,6 +1,6 @@
 import { History } from 'lucide-react';
 import { ModuleHistory } from '@/components/data/ModuleHistory';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Building2,
   Camera,
@@ -19,7 +19,7 @@ import { ListToolbar } from '@/components/data/ListToolbar';
 import { DataTable } from '@/components/data/DataTable';
 import { MultiSelectFilter, type FilterOption } from '@/components/ui/MultiSelectFilter';
 import type { ColumnDef } from '@/stores/createListStore';
-import { useSupplierOrderStore } from '@/stores/hoaKhangThanhStore';
+import { syncAllOrdersToDebtRecords, useSupplierOrderStore } from '@/stores/hoaKhangThanhStore';
 import type { SupplierOrder, SupplierOrderItem } from '@/types/hoaKhangThanh';
 import { formatDate, parseDateTimestamp } from '@/lib/format';
 import { useColumnSettings } from '@/hooks/useColumnSettings';
@@ -46,6 +46,11 @@ const INITIAL_COLUMNS: ColumnDef[] = [
 
 export default function DonHangNCCPage() {
   const { orders, deleteOrder } = useSupplierOrderStore();
+
+  // Tự động kiểm tra và đồng bộ đơn nhập sang sổ công nợ
+  useEffect(() => {
+    syncAllOrdersToDebtRecords();
+  }, []);
   const [activeTab, setActiveTab] = useState<Tab>('danhsach');
   const [searchTerm, setSearchTerm] = useState('');
 
