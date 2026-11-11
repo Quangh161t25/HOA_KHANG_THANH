@@ -1,26 +1,47 @@
 import { useMemo } from 'react';
 import { DollarSign, MapPin, Star, Truck } from 'lucide-react';
 import { BarChartBox, ChartCard, StatCard, useChartReady } from '@/components/data/StatsKit';
-import { useSupplierStore } from '@/stores/hoaKhangThanhStore';
+import {
+  calculateSupplierFinancials,
+  useDebtStore,
+  useSupplierOrderStore,
+  useSupplierStore,
+} from '@/stores/hoaKhangThanhStore';
 
 export function NCCStats() {
   const { suppliers } = useSupplierStore();
+  const { records: debtRecords } = useDebtStore();
+  const { orders: supplierOrders } = useSupplierOrderStore();
   const ready = useChartReady();
 
+  const enrichedSuppliers = useMemo(() => {
+    return suppliers.map((s) => {
+      const fin = calculateSupplierFinancials(s, debtRecords, supplierOrders);
+      return {
+        ...s,
+        oldDebt: fin.oldDebt,
+        importAmount: fin.importAmount,
+        paidAmount: fin.paidAmount,
+        finalDebt: fin.finalDebt,
+        totalDebt: fin.totalDebt,
+      };
+    });
+  }, [suppliers, debtRecords, supplierOrders]);
+
   const metrics = useMemo(() => {
-    const total = suppliers.length;
-    const totalDebt = suppliers.reduce((sum, s) => sum + s.totalDebt, 0);
-    const dalatCount = suppliers.filter((s) => s.address.includes('Lâm Đồng') || s.address.includes('Đà Lạt')).length;
-    const avgRating = (suppliers.reduce((sum, s) => sum + s.rating, 0) / (total || 1)).toFixed(1);
+    const total = enrichedSuppliers.length;
+    const totalDebt = enrichedSuppliers.reduce((sum, s) => sum + (s.finalDebt ?? s.totalDebt ?? 0), 0);
+    const dalatCount = enrichedSuppliers.filter((s) => s.address.includes('Lâm Đồng') || s.address.includes('Đà Lạt')).length;
+    const avgRating = (enrichedSuppliers.reduce((sum, s) => sum + s.rating, 0) / (total || 1)).toFixed(1);
     return { total, totalDebt, dalatCount, avgRating };
-  }, [suppliers]);
+  }, [enrichedSuppliers]);
 
   const byDebt = useMemo(() => {
-    return suppliers.map((s) => ({
+    return enrichedSuppliers.map((s) => ({
       name: s.name.length > 15 ? `${s.name.slice(0, 15)}...` : s.name,
-      value: s.totalDebt / 1000000,
+      value: (s.finalDebt ?? s.totalDebt ?? 0) / 1000000,
     }));
-  }, [suppliers]);
+  }, [enrichedSuppliers]);
 
   const formatVND = (num: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num);

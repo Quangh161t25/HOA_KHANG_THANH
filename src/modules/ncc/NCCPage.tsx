@@ -20,7 +20,13 @@ import { DataTable } from '@/components/data/DataTable';
 import { MultiSelectFilter, type FilterOption } from '@/components/ui/MultiSelectFilter';
 import type { ColumnDef } from '@/stores/createListStore';
 import { useColumnSettings } from '@/hooks/useColumnSettings';
-import { clearAllDebtAndOrderData, useSupplierStore } from '@/stores/hoaKhangThanhStore';
+import {
+  calculateSupplierFinancials,
+  clearAllDebtAndOrderData,
+  useDebtStore,
+  useSupplierOrderStore,
+  useSupplierStore,
+} from '@/stores/hoaKhangThanhStore';
 import type { Supplier } from '@/types/hoaKhangThanh';
 import { NCCDrawer } from './NCCDrawer';
 import { NCCStats } from './NCCStats';
@@ -45,6 +51,23 @@ const INITIAL_COLUMNS: ColumnDef[] = [
 
 export default function NCCPage() {
   const { suppliers, deleteSupplier } = useSupplierStore();
+  const { records: debtRecords } = useDebtStore();
+  const { orders: supplierOrders } = useSupplierOrderStore();
+
+  // Đồng bộ và tính toán chính xác tiền nhập hoa, tiền trả, công nợ cuối cho từng NCC từ sổ công nợ & đơn nhập
+  const enrichedSuppliers = useMemo(() => {
+    return suppliers.map((s) => {
+      const fin = calculateSupplierFinancials(s, debtRecords, supplierOrders);
+      return {
+        ...s,
+        oldDebt: fin.oldDebt,
+        importAmount: fin.importAmount,
+        paidAmount: fin.paidAmount,
+        finalDebt: fin.finalDebt,
+        totalDebt: fin.totalDebt,
+      };
+    });
+  }, [suppliers, debtRecords, supplierOrders]);
   const [activeTab, setActiveTab] = useState<Tab>('danhsach');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -73,14 +96,14 @@ export default function NCCPage() {
 
   const statusOptions: FilterOption[] = useMemo(() => {
     const map: Record<string, number> = {};
-    suppliers.forEach((s) => {
+    enrichedSuppliers.forEach((s) => {
       map[s.status] = (map[s.status] || 0) + 1;
     });
     return [
       { label: 'Đang hợp tác', value: 'active', count: map['active'] || 0 },
       { label: 'Tạm ngưng', value: 'inactive', count: map['inactive'] || 0 },
     ];
-  }, [suppliers]);
+  }, [enrichedSuppliers]);
 
   const regionOptions: FilterOption[] = [
     { label: 'Lâm Đồng / Đà Lạt', value: 'Lâm Đồng' },
@@ -90,7 +113,7 @@ export default function NCCPage() {
   ];
 
   const filteredData = useMemo(() => {
-    return suppliers.filter((s) => {
+    return enrichedSuppliers.filter((s) => {
       const q = searchTerm.toLowerCase();
       const matchSearch =
         !q ||
@@ -107,7 +130,7 @@ export default function NCCPage() {
 
       return matchSearch && matchStatus && matchRegion;
     });
-  }, [suppliers, searchTerm, selectedStatuses, selectedRegions]);
+  }, [enrichedSuppliers, searchTerm, selectedStatuses, selectedRegions]);
 
   
   const handleToggleSelection = (id: string) => {

@@ -24,8 +24,10 @@ import { MultiSelectFilter, type FilterOption } from '@/components/ui/MultiSelec
 import type { ColumnDef } from '@/stores/createListStore';
 import { useColumnSettings } from '@/hooks/useColumnSettings';
 import {
+  calculateDistributorFinancials,
   clearAllDebtAndOrderData,
   normalizeToISODate,
+  useDebtStore,
   useDistributorStore,
   useOrderStore,
 } from '@/stores/hoaKhangThanhStore';
@@ -57,6 +59,23 @@ const INITIAL_COLUMNS: ColumnDef[] = [
 export default function NPPPage() {
   const { distributors, deleteDistributor } = useDistributorStore();
   const { orders } = useOrderStore();
+  const { records: debtRecords } = useDebtStore();
+
+  // Đồng bộ và tính toán chính xác tiền bán hoa, tiền thu nợ, công nợ cuối cho từng NPP từ sổ công nợ & đơn hàng
+  const enrichedDistributors = useMemo(() => {
+    return distributors.map((d) => {
+      const fin = calculateDistributorFinancials(d, debtRecords, orders);
+      return {
+        ...d,
+        oldDebt: fin.oldDebt,
+        salesAmount: fin.salesAmount,
+        collectedAmount: fin.collectedAmount,
+        finalDebt: fin.finalDebt,
+        currentDebt: fin.finalDebt,
+        totalRevenue: fin.totalRevenue,
+      };
+    });
+  }, [distributors, debtRecords, orders]);
   const [activeTab, setActiveTab] = useState<Tab>('danhsach');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -100,7 +119,7 @@ export default function NPPPage() {
       }
     >();
 
-    distributors.forEach((d) => {
+    enrichedDistributors.forEach((d) => {
       const matching = orders.filter((o) => {
         const matchId = o.distributorId === d.id;
         const matchName =
@@ -152,7 +171,7 @@ export default function NPPPage() {
     });
 
     return map;
-  }, [distributors, orders]);
+  }, [enrichedDistributors, orders]);
 
   // Thống kê nhanh số lượng NPP theo tình trạng lên đơn
   const orderActivityCounts = useMemo(() => {
@@ -160,7 +179,7 @@ export default function NPPPage() {
     let recent = 0;
     let none = 0;
 
-    distributors.forEach((d) => {
+    enrichedDistributors.forEach((d) => {
       const info = distributorOrderMap.get(d.id);
       if (!info || info.statusCategory === 'none') {
         none++;
@@ -171,8 +190,8 @@ export default function NPPPage() {
       }
     });
 
-    return { overdue, recent, none, total: distributors.length };
-  }, [distributors, distributorOrderMap]);
+    return { overdue, recent, none, total: enrichedDistributors.length };
+  }, [enrichedDistributors, distributorOrderMap]);
 
   const tierOptions: FilterOption[] = [
     { label: 'VIP 1 (Kim Cương)', value: 'VIP 1 (Kim Cương)' },
@@ -183,11 +202,11 @@ export default function NPPPage() {
 
   const regionOptions: FilterOption[] = useMemo(() => {
     const map: Record<string, number> = {};
-    distributors.forEach((d) => {
+    enrichedDistributors.forEach((d) => {
       map[d.region] = (map[d.region] || 0) + 1;
     });
     return Object.entries(map).map(([r, count]) => ({ label: r, value: r, count }));
-  }, [distributors]);
+  }, [enrichedDistributors]);
 
   const statusOptions: FilterOption[] = [
     { label: 'Đang hoạt động', value: 'active' },
@@ -203,7 +222,7 @@ export default function NPPPage() {
   }, [orderActivityCounts]);
 
   const filteredData = useMemo(() => {
-    return distributors.filter((d) => {
+    return enrichedDistributors.filter((d) => {
       const q = searchTerm.toLowerCase();
       const matchSearch =
         !q ||
@@ -226,7 +245,7 @@ export default function NPPPage() {
       return matchSearch && matchTier && matchRegion && matchStatus && matchActivity && matchQuickTab;
     });
   }, [
-    distributors,
+    enrichedDistributors,
     searchTerm,
     selectedTiers,
     selectedRegions,

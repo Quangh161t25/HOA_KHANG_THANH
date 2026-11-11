@@ -18,6 +18,8 @@ import {
   useOrderStore,
   useSupplierOrderStore,
   useSupplierStore,
+  recalcAllDistributorsDebts,
+  recalcAllSuppliersDebts,
 } from './stores/hoaKhangThanhStore';
 import { useOrderLogStore } from './stores/orderLogStore';
 import { useModuleAuditStore } from './stores/moduleAuditStore';
@@ -47,6 +49,10 @@ async function bootstrap() {
   ]);
 
   if (hydrated) {
+    // Tự động tính toán số dư công nợ, tiền bán hoa, tiền trả cho NPP & NCC dựa trên dữ liệu IndexedDB
+    recalcAllDistributorsDebts();
+    recalcAllSuppliersDebts();
+
     // Không tự đồng bộ đơn hàng → công nợ lúc khởi động: công nợ lấy từ Google Sheets làm chuẩn.
     // (Đơn tạo/sửa trong app vẫn tự tạo công nợ qua syncOrderToDebt.)
     initGoogleSheetsAutoSync();

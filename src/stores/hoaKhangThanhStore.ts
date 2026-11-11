@@ -908,6 +908,134 @@ export function normalizeToISODate(dateStr?: string): string {
 }
 
 /**
+ * Tính toán tài chính công nợ & tiền bán hoa của NPP từ sổ công nợ và đơn hàng
+ */
+export function calculateDistributorFinancials(
+  distributor: Distributor,
+  debtRecords: DebtDailyRecord[],
+  orders: Order[]
+) {
+  const normName = distributor.name ? distributor.name.trim().toLowerCase() : '';
+
+  // 1. Lọc tất cả bản ghi công nợ của NPP này
+  const matchingRecords = debtRecords.filter(
+    (r) =>
+      r.partnerType === 'npp' &&
+      (r.partnerId === distributor.id ||
+        (r.partnerCode && r.partnerCode === distributor.code) ||
+        (r.partnerName && r.partnerName.trim().toLowerCase() === normName))
+  );
+
+  let debtSales = 0;
+  let debtCollected = 0;
+  const recordedOrderCodes = new Set<string>();
+
+  for (const r of matchingRecords) {
+    const isThu = r.type === 'thu' || ((r.decreaseAmount || 0) > 0 && (r.increaseAmount || 0) === 0);
+    const inc = r.increaseAmount !== undefined ? r.increaseAmount : (!isThu ? (r.amount || 0) : 0);
+    const dec = r.decreaseAmount !== undefined ? r.decreaseAmount : (isThu ? (r.amount || 0) : 0);
+    debtSales += inc;
+    debtCollected += dec;
+    if (r.referenceCode) recordedOrderCodes.add(r.referenceCode);
+    if (r.id && r.id.startsWith('debt-dh-')) recordedOrderCodes.add(r.id.replace('debt-dh-', ''));
+  }
+
+  // 2. Các đơn hàng chưa ghi nhận vào sổ công nợ
+  const matchingOrders = orders.filter(
+    (o) =>
+      o.distributorId === distributor.id ||
+      (o.distributorName && o.distributorName.trim().toLowerCase() === normName)
+  );
+
+  let unrecordedSales = 0;
+  let unrecordedCollected = 0;
+
+  for (const o of matchingOrders) {
+    const isRecorded = (o.code && recordedOrderCodes.has(o.code)) || recordedOrderCodes.has(o.id);
+    if (!isRecorded && o.status !== 'huy') {
+      unrecordedSales += (o.totalAmount || 0);
+      unrecordedCollected += (o.paidAmount || 0);
+    }
+  }
+
+  const oldDebt = distributor.oldDebt || 0;
+  const salesAmount = debtSales + unrecordedSales;
+  const collectedAmount = debtCollected + unrecordedCollected;
+  const finalDebt = oldDebt + salesAmount - collectedAmount;
+
+  return {
+    oldDebt,
+    salesAmount,
+    collectedAmount,
+    finalDebt,
+    totalRevenue: salesAmount,
+  };
+}
+
+/**
+ * Tính toán tài chính công nợ & tiền nhập hoa của Nhà Cung Cấp từ sổ công nợ và đơn nhập
+ */
+export function calculateSupplierFinancials(
+  supplier: Supplier,
+  debtRecords: DebtDailyRecord[],
+  supplierOrders: SupplierOrder[]
+) {
+  const normName = supplier.name ? supplier.name.trim().toLowerCase() : '';
+
+  const matchingRecords = debtRecords.filter(
+    (r) =>
+      r.partnerType === 'ncc' &&
+      (r.partnerId === supplier.id ||
+        (r.partnerCode && r.partnerCode === supplier.code) ||
+        (r.partnerName && r.partnerName.trim().toLowerCase() === normName))
+  );
+
+  let debtImport = 0;
+  let debtPaid = 0;
+  const recordedOrderCodes = new Set<string>();
+
+  for (const r of matchingRecords) {
+    const isThu = r.type === 'thu' || ((r.decreaseAmount || 0) > 0 && (r.increaseAmount || 0) === 0);
+    const inc = r.increaseAmount !== undefined ? r.increaseAmount : (!isThu ? (r.amount || 0) : 0);
+    const dec = r.decreaseAmount !== undefined ? r.decreaseAmount : (isThu ? (r.amount || 0) : 0);
+    debtImport += inc;
+    debtPaid += dec;
+    if (r.referenceCode) recordedOrderCodes.add(r.referenceCode);
+    if (r.id && r.id.startsWith('debt-ncc-')) recordedOrderCodes.add(r.id.replace('debt-ncc-', ''));
+  }
+
+  const matchingOrders = supplierOrders.filter(
+    (o) =>
+      o.supplierId === supplier.id ||
+      (o.supplierName && o.supplierName.trim().toLowerCase() === normName)
+  );
+
+  let unrecordedImport = 0;
+  let unrecordedPaid = 0;
+
+  for (const o of matchingOrders) {
+    const isRecorded = (o.code && recordedOrderCodes.has(o.code)) || recordedOrderCodes.has(o.id);
+    if (!isRecorded && o.status !== 'huy') {
+      unrecordedImport += (o.totalAmount || 0);
+      unrecordedPaid += (o.paidAmount || 0);
+    }
+  }
+
+  const oldDebt = supplier.oldDebt || 0;
+  const importAmount = debtImport + unrecordedImport;
+  const paidAmount = debtPaid + unrecordedPaid;
+  const finalDebt = oldDebt + importAmount - paidAmount;
+
+  return {
+    oldDebt,
+    importAmount,
+    paidAmount,
+    finalDebt,
+    totalDebt: finalDebt,
+  };
+}
+
+/**
  * Tính toán lại tổng phát sinh và công nợ cuối của Nhà Phân Phối
  */
 export function recalcDistributorDebts(distId?: string) {
@@ -919,35 +1047,14 @@ export function recalcDistributorDebts(distId?: string) {
   const dist = distStore.distributors.find((d) => d.id === distId);
   if (!dist) return;
 
-  const distOrders = orderStore.orders.filter(
-    (o) =>
-      o.distributorId === distId ||
-      (o.distributorName && o.distributorName.trim().toLowerCase() === dist.name.trim().toLowerCase()),
-  );
-  const totalSalesFromOrders = distOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-  const totalPaidFromOrders = distOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
-
-  const orderCodes = new Set(distOrders.map((o) => o.code));
-  const manualRecords = debtStore.records.filter(
-    (r) =>
-      r.partnerType === 'npp' &&
-      (r.partnerId === distId ||
-        (r.partnerName && r.partnerName.trim().toLowerCase() === dist.name.trim().toLowerCase())) &&
-      (!r.referenceCode || !orderCodes.has(r.referenceCode)),
-  );
-  const manualSales = manualRecords.reduce((sum, r) => sum + (r.increaseAmount || 0), 0);
-  const manualPaid = manualRecords.reduce((sum, r) => sum + (r.decreaseAmount || 0), 0);
-
-  const totalSales = totalSalesFromOrders + manualSales;
-  const totalCollected = totalPaidFromOrders + manualPaid;
-  const finalDebt = (dist.oldDebt || 0) + totalSales - totalCollected;
+  const fin = calculateDistributorFinancials(dist, debtStore.records, orderStore.orders);
 
   distStore.updateDistributor(dist.id, {
-    salesAmount: totalSales,
-    collectedAmount: totalCollected,
-    finalDebt,
-    currentDebt: finalDebt,
-    totalRevenue: totalSales,
+    salesAmount: fin.salesAmount,
+    collectedAmount: fin.collectedAmount,
+    finalDebt: fin.finalDebt,
+    currentDebt: fin.finalDebt,
+    totalRevenue: fin.totalRevenue,
   });
 
   // Tự động tính toán lại và đồng bộ công nợ cũ & thanh toán cho toàn bộ đơn hàng liên quan của NPP này
@@ -1125,35 +1232,63 @@ export function recalcSupplierDebts(supplierId?: string) {
   const supplier = supStore.suppliers.find((s) => s.id === supplierId);
   if (!supplier) return;
 
-  const orders = supOrderStore.orders.filter(
-    (o) =>
-      o.supplierId === supplierId ||
-      (o.supplierName && o.supplierName.trim().toLowerCase() === supplier.name.trim().toLowerCase()),
-  );
-  const totalImportFromOrders = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-  const totalPaidFromOrders = orders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
-
-  const orderCodes = new Set(orders.map((o) => o.code));
-  const manualRecords = debtStore.records.filter(
-    (r) =>
-      r.partnerType === 'ncc' &&
-      (r.partnerId === supplierId ||
-        (r.partnerName && r.partnerName.trim().toLowerCase() === supplier.name.trim().toLowerCase())) &&
-      (!r.referenceCode || !orderCodes.has(r.referenceCode)),
-  );
-  const manualImport = manualRecords.reduce((sum, r) => sum + (r.increaseAmount || 0), 0);
-  const manualPaid = manualRecords.reduce((sum, r) => sum + (r.decreaseAmount || 0), 0);
-
-  const totalImport = totalImportFromOrders + manualImport;
-  const totalPaid = totalPaidFromOrders + manualPaid;
-  const finalDebt = (supplier.oldDebt || 0) + totalImport - totalPaid;
+  const fin = calculateSupplierFinancials(supplier, debtStore.records, supOrderStore.orders);
 
   supStore.updateSupplier(supplier.id, {
-    importAmount: totalImport,
-    paidAmount: totalPaid,
-    finalDebt,
-    totalDebt: finalDebt,
+    importAmount: fin.importAmount,
+    paidAmount: fin.paidAmount,
+    finalDebt: fin.finalDebt,
+    totalDebt: fin.totalDebt,
   });
+}
+
+/**
+ * Tính toán lại toàn bộ tài chính công nợ cho tất cả Nhà Phân Phối
+ */
+export function recalcAllDistributorsDebts() {
+  const orderStore = useOrderStore.getState();
+  const debtStore = useDebtStore.getState();
+  const distStore = useDistributorStore.getState();
+
+  if (distStore.distributors.length === 0) return;
+
+  const updatedDistributors = distStore.distributors.map((dist) => {
+    const fin = calculateDistributorFinancials(dist, debtStore.records, orderStore.orders);
+    return {
+      ...dist,
+      salesAmount: fin.salesAmount,
+      collectedAmount: fin.collectedAmount,
+      finalDebt: fin.finalDebt,
+      currentDebt: fin.finalDebt,
+      totalRevenue: fin.totalRevenue,
+    };
+  });
+
+  useDistributorStore.setState({ distributors: updatedDistributors });
+}
+
+/**
+ * Tính toán lại toàn bộ tài chính công nợ cho tất cả Nhà Cung Cấp
+ */
+export function recalcAllSuppliersDebts() {
+  const supOrderStore = useSupplierOrderStore.getState();
+  const debtStore = useDebtStore.getState();
+  const supStore = useSupplierStore.getState();
+
+  if (supStore.suppliers.length === 0) return;
+
+  const updatedSuppliers = supStore.suppliers.map((s) => {
+    const fin = calculateSupplierFinancials(s, debtStore.records, supOrderStore.orders);
+    return {
+      ...s,
+      importAmount: fin.importAmount,
+      paidAmount: fin.paidAmount,
+      finalDebt: fin.finalDebt,
+      totalDebt: fin.totalDebt,
+    };
+  });
+
+  useSupplierStore.setState({ suppliers: updatedSuppliers });
 }
 
 /**

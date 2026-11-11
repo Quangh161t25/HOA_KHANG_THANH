@@ -1,23 +1,45 @@
 import { useMemo } from 'react';
 import { AlertTriangle, CreditCard, DollarSign, MapPin, Store, Trophy } from 'lucide-react';
 import { BarChartBox, ChartCard, StatCard, useChartReady } from '@/components/data/StatsKit';
-import { normalizeToISODate, useDistributorStore, useOrderStore } from '@/stores/hoaKhangThanhStore';
+import {
+  calculateDistributorFinancials,
+  normalizeToISODate,
+  useDebtStore,
+  useDistributorStore,
+  useOrderStore,
+} from '@/stores/hoaKhangThanhStore';
 import { getDaysDifference } from '@/lib/debtCheck';
 
 export function NPPStats() {
   const { distributors } = useDistributorStore();
   const { orders } = useOrderStore();
+  const { records: debtRecords } = useDebtStore();
   const ready = useChartReady();
 
+  const enrichedDistributors = useMemo(() => {
+    return distributors.map((d) => {
+      const fin = calculateDistributorFinancials(d, debtRecords, orders);
+      return {
+        ...d,
+        oldDebt: fin.oldDebt,
+        salesAmount: fin.salesAmount,
+        collectedAmount: fin.collectedAmount,
+        finalDebt: fin.finalDebt,
+        currentDebt: fin.finalDebt,
+        totalRevenue: fin.totalRevenue,
+      };
+    });
+  }, [distributors, debtRecords, orders]);
+
   const metrics = useMemo(() => {
-    const total = distributors.length;
-    const totalDebt = distributors.reduce((sum, d) => sum + (d.finalDebt ?? d.currentDebt ?? 0), 0);
-    const totalRevenue = distributors.reduce((sum, d) => sum + (d.salesAmount || d.totalRevenue || 0), 0);
-    const vipCount = distributors.filter((d) => d.tier.includes('VIP')).length;
+    const total = enrichedDistributors.length;
+    const totalDebt = enrichedDistributors.reduce((sum, d) => sum + (d.finalDebt ?? d.currentDebt ?? 0), 0);
+    const totalRevenue = enrichedDistributors.reduce((sum, d) => sum + (d.salesAmount || d.totalRevenue || 0), 0);
+    const vipCount = enrichedDistributors.filter((d) => d.tier.includes('VIP')).length;
 
     // Đếm NPP quá 3 ngày chưa lên đơn mới
     let overdueCount = 0;
-    distributors.forEach((d) => {
+    enrichedDistributors.forEach((d) => {
       const matching = orders.filter((o) => {
         const matchId = o.distributorId === d.id;
         const matchName =
@@ -50,22 +72,22 @@ export function NPPStats() {
     });
 
     return { total, totalDebt, totalRevenue, vipCount, overdueCount };
-  }, [distributors, orders]);
+  }, [enrichedDistributors, orders]);
 
   const byRevenue = useMemo(() => {
-    return distributors.map((d) => ({
+    return enrichedDistributors.map((d) => ({
       name: d.name.length > 15 ? `${d.name.slice(0, 15)}...` : d.name,
       value: (d.salesAmount || d.totalRevenue || 0) / 1000000,
     }));
-  }, [distributors]);
+  }, [enrichedDistributors]);
 
   const byRegion = useMemo(() => {
     const map: Record<string, number> = {};
-    distributors.forEach((d) => {
+    enrichedDistributors.forEach((d) => {
       map[d.region] = (map[d.region] || 0) + 1;
     });
     return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [distributors]);
+  }, [enrichedDistributors]);
 
   const formatNumber = (num: number) => {
     return (num || 0).toLocaleString('vi-VN');

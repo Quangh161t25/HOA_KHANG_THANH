@@ -12,6 +12,8 @@ import {
   useOrderStore,
   useSupplierOrderStore,
   useSupplierStore,
+  recalcAllDistributorsDebts,
+  recalcAllSuppliersDebts,
 } from '@/stores/hoaKhangThanhStore';
 import { useOrderLogStore } from '@/stores/orderLogStore';
 import type {
@@ -423,6 +425,10 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
           ? allSuppliers.find((s) => s.name?.trim().toLowerCase() === partnerName.toLowerCase() || s.code === partnerName)
           : null;
 
+        const type = (r[3] === 'thu' || r[3] === 'Thu' ? 'thu' : 'chi') as DebtDailyRecord['type'];
+        const amount = parseSheetNumber(r[4]) || 0;
+        const isThu = type === 'thu';
+
         return {
           id: `cn-sync-${idx + 1}`,
           date: fromSheetDate(r[0]),
@@ -430,10 +436,12 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
           partnerId: matchedDist?.id || matchedSup?.id || `partner-sync-${idx + 1}`,
           partnerCode: matchedDist?.code || matchedSup?.code || '',
           partnerName,
-          type: (r[3] === 'thu' || r[3] === 'Thu' ? 'thu' : 'chi') as DebtDailyRecord['type'],
-          amount: parseSheetNumber(r[4]) || 0,
+          type,
+          amount,
           remainingDebt: parseSheetNumber(r[5]) || 0,
           finalDebt: parseSheetNumber(r[5]) || 0,
+          increaseAmount: isThu ? 0 : amount,
+          decreaseAmount: isThu ? amount : 0,
           referenceCode: String(r[6] || '').trim(),
           creator: String(r[7] || '').trim(),
           notes: String(r[8] || '').trim(),
@@ -568,6 +576,10 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
       useSupplierOrderStore.setState({ orders: supplierOrders });
       counts['don_nhap_ncc'] = supplierOrders.length;
     }
+
+    // Tự động tính toán lại toàn bộ doanh số bán hoa, công nợ cũ, đã trả, nợ cuối cho NPP & NCC
+    recalcAllDistributorsDebts();
+    recalcAllSuppliersDebts();
 
     const parts = [
       counts['hoa'] ? `${counts['hoa']} loại hoa` : '',
