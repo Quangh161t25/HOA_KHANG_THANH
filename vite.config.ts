@@ -9,6 +9,8 @@ export default defineConfig(({ mode }) => {
   Object.assign(process.env, env);
 
   return {
+    // GitHub Pages chạy trong thư mục con /<tên-repo>/ (workflow đặt VITE_BASE_PATH)
+    base: env.VITE_BASE_PATH || process.env.VITE_BASE_PATH || '/',
     plugins: [react(), tailwindcss(), googleSheetsPlugin()],
     resolve: {
       alias: { '@': path.resolve(__dirname, 'src') },

@@ -1,6 +1,13 @@
 import { actionLabels, pauseModuleAudit, useModuleAuditStore } from '@/stores/moduleAuditStore';
 import { GOOGLE_SHEETS_CONFIG } from '@/config/googleSheetsConfig';
 import { fromSheetDate } from '@/lib/sheetDate';
+import { buildSheetTables } from '@/lib/sheetTables';
+
+/**
+ * Bản chạy trên GitHub Pages không có server /api → đọc/ghi Sheets qua Google Apps Script.
+ * Để trống khi chạy bằng Vite dev / Vercel (dùng server /api có service account).
+ */
+const APPS_SCRIPT_URL = String(import.meta.env.VITE_APPS_SCRIPT_URL || '').trim();
 import {
   useCashStore,
   useDebtStore,
@@ -96,7 +103,9 @@ export function parseSheetNumber(val: unknown): number {
  */
 export async function checkGoogleSheetsConnection(): Promise<GoogleSheetsStatus> {
   try {
-    const res = await fetch('/api/google-sheets/status');
+    const res = APPS_SCRIPT_URL
+      ? await fetch(`${APPS_SCRIPT_URL}?action=status`)
+      : await fetch('/api/google-sheets/status');
     const data = await res.json();
     if (!res.ok || !data.success) {
       return {
@@ -160,11 +169,19 @@ export async function syncAllToGoogleSheets(): Promise<SyncResult> {
       auditLogs,
     };
 
-    const res = await fetch('/api/google-sheets/sync-all', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    const res = APPS_SCRIPT_URL
+      ? // GitHub Pages: dựng sẵn các bảng rồi gửi cho Google Apps Script ghi vào Sheets.
+        // text/plain để trình duyệt không gửi preflight CORS (Apps Script không hỗ trợ OPTIONS).
+        await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ tables: buildSheetTables(payload) }),
+        })
+      : await fetch('/api/google-sheets/sync-all', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
 
     const result = await res.json();
     if (!res.ok || !result.success) {
@@ -194,7 +211,9 @@ export async function syncAllToGoogleSheets(): Promise<SyncResult> {
 export async function pullFromGoogleSheets(): Promise<{ success: boolean; message: string }> {
   let resumeAudit: (() => void) | undefined;
   try {
-    const res = await fetch('/api/google-sheets/pull-all');
+    const res = APPS_SCRIPT_URL
+      ? await fetch(`${APPS_SCRIPT_URL}?action=pull`)
+      : await fetch('/api/google-sheets/pull-all');
     const result = await res.json();
     if (!res.ok || !result.success) {
       throw new Error(result.error ? JSON.stringify(result.error) : 'Lỗi khi tải từ Google Sheets');

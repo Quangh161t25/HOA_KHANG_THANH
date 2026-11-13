@@ -26,7 +26,7 @@ export function generateInvoiceUrl(order: Order): string {
     )
     .join('_b_');
 
-  return `/hoa_khang_thanh.html?id=${code}?phone=${phone}?ngay=${encodeURIComponent(ngay)}?khach_hang=${khachHang}?cuoc=${cuoc}?tru_hang=${truHang}?cong_no=${congNo}?${products}`;
+  return `${import.meta.env.BASE_URL}hoa_khang_thanh.html?id=${code}?phone=${phone}?ngay=${encodeURIComponent(ngay)}?khach_hang=${khachHang}?cuoc=${cuoc}?tru_hang=${truHang}?cong_no=${congNo}?${products}`;
 }
 
 export function HoaDonPrintModal({ isOpen, onClose, order }: Props) {
