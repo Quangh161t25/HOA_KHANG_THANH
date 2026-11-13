@@ -912,6 +912,25 @@ export const useSupplierOrderStore = create<SupplierOrderState>()(
 /**
  * Chuẩn hóa chuỗi ngày sang định dạng YYYY-MM-DD
  */
+/**
+ * Tổng tiền thực của đơn (đơn bán hoặc đơn nhập NCC) dùng cho công nợ.
+ * Nhiều đơn tải từ Google Sheets có cột Tổng tiền = 0 nhưng vẫn có các dòng hoa:
+ * khi đó lấy tổng các dòng hoa + phí ship − giảm giá.
+ */
+export function getOrderTotal(
+  o: {
+    totalAmount?: number;
+    shippingFee?: number;
+    discount?: number;
+    items?: Array<{ amount?: number; quantity?: number; unitPrice?: number; costPrice?: number }>;
+  },
+  priceKey: 'unitPrice' | 'costPrice' = 'unitPrice',
+): number {
+  if (o.totalAmount) return o.totalAmount;
+  const subtotal = (o.items || []).reduce((sum, i) => sum + (i.amount || (i.quantity || 0) * (i[priceKey] || 0)), 0);
+  return subtotal > 0 ? subtotal + (o.shippingFee || 0) - (o.discount || 0) : 0;
+}
+
 export function normalizeToISODate(dateStr?: string): string {
   if (!dateStr) return todayISODate();
   const trimmed = dateStr.trim();
@@ -977,7 +996,7 @@ export function calculateDistributorFinancials(
   for (const o of matchingOrders) {
     const isRecorded = (o.code && recordedOrderCodes.has(o.code)) || recordedOrderCodes.has(o.id);
     if (!isRecorded && o.status !== 'huy') {
-      unrecordedSales += (o.totalAmount || 0);
+      unrecordedSales += getOrderTotal(o);
       unrecordedCollected += (o.paidAmount || 0);
     }
   }
@@ -1040,7 +1059,7 @@ export function calculateSupplierFinancials(
   for (const o of matchingOrders) {
     const isRecorded = (o.code && recordedOrderCodes.has(o.code)) || recordedOrderCodes.has(o.id);
     if (!isRecorded && o.status !== 'huy') {
-      unrecordedImport += (o.totalAmount || 0);
+      unrecordedImport += getOrderTotal(o, 'costPrice');
       unrecordedPaid += (o.paidAmount || 0);
     }
   }
@@ -1138,33 +1157,60 @@ export function recalcDistributorDebts(distId?: string) {
 }
 
 /**
- * Tự động đồng bộ đơn hàng bán vào Quản lý Công nợ theo ngày & Cập nhật NPP
+ * Dòng công nợ đã LƯU nhưng thực chất sinh ra từ đơn hàng / đơn nhập NCC.
+ * Từ nay công nợ của đơn là CỘT ẢO (tính từ đơn khi hiển thị), nên các dòng này phải bỏ khỏi sổ.
+ * Giữ lại phiếu THU nhập tay dù có ghi mã đơn (đó là tiền khách trả thật).
+ */
+export function isOrderDerivedDebtRecord(r: DebtDailyRecord, orderCodes: Set<string>): boolean {
+  if (r.id.startsWith('debt-dh-') || r.id.startsWith('debt-order-') || r.id.startsWith('debt-ncc-')) return true;
+  if (r.type === 'thu') return false;
+  if (r.entryType === 'order' && r.referenceCode) return true;
+  return Boolean(r.referenceCode && orderCodes.has(r.referenceCode.trim()));
+}
+
+/** Bỏ các dòng công nợ đã lưu sinh ra từ các mã đơn cho trước. Trả về số dòng đã bỏ. */
+function purgeOrderDerivedRecords(orderCodes: Set<string>, orderIds: Set<string> = new Set()): number {
+  const records = useDebtStore.getState().records;
+  const next = records.filter((r) => {
+    if (
+      orderIds.size &&
+      ['debt-dh-', 'debt-order-', 'debt-ncc-'].some((p) => r.id.startsWith(p) && orderIds.has(r.id.slice(p.length)))
+    ) {
+      return false;
+    }
+    if (r.type === 'thu') return true;
+    return !(r.referenceCode && orderCodes.has(r.referenceCode.trim()));
+  });
+  if (next.length !== records.length) useDebtStore.setState({ records: next });
+  return records.length - next.length;
+}
+
+/**
+ * Đơn hàng bán thay đổi → công nợ của khách tự đổi theo.
+ * Công nợ của đơn là cột ảo (không lưu), nên chỉ cần: tạo NPP nếu chưa có,
+ * bỏ dòng công nợ cũ (nếu còn sót) và tính lại công nợ của NPP.
  */
 export function syncOrderToDebt(order: Order, previousCode?: string) {
-  const debtStore = useDebtStore.getState();
   const distStore = useDistributorStore.getState();
 
-  // Đơn hủy thì tự động loại bỏ khỏi công nợ
+  const codes = new Set([order.code, previousCode].filter(Boolean) as string[]);
+  purgeOrderDerivedRecords(codes, new Set([order.id]));
+
   if (order.status === 'huy' || order.status === 'cancelled') {
-    removeOrderFromDebt(order.code, order.id, order.distributorId);
+    recalcDistributorDebts(order.distributorId);
     return;
   }
 
-  // 1. Tìm hoặc tự động tạo NPP nếu chưa có
+  // Tìm hoặc tự động tạo NPP nếu chưa có
   let dist = distStore.distributors.find(
     (d) =>
       (order.distributorId && d.id === order.distributorId) ||
       (d.name && d.name.trim().toLowerCase() === order.distributorName.trim().toLowerCase()),
   );
 
-  const itemsSubtotal = (order.items || []).reduce(
-    (sum, i) => sum + (i.amount || ((i.quantity || 0) * (i.unitPrice || 0))),
-    0
-  );
-  const totalAmount = order.totalAmount || (itemsSubtotal > 0 ? (itemsSubtotal + (order.shippingFee || 0) - (order.discount || 0)) : 0);
-  const decreaseAmount = order.paidAmount || 0;
-
   if (!dist && order.distributorName.trim()) {
+    const totalAmount = getOrderTotal(order);
+    const paid = order.paidAmount || 0;
     const newDist: Distributor = {
       id: order.distributorId || `npp-${Date.now()}`,
       code: `NPP-${(distStore.distributors.length + 1).toString().padStart(3, '0')}`,
@@ -1179,78 +1225,23 @@ export function syncOrderToDebt(order: Order, previousCode?: string) {
       totalRevenue: totalAmount,
       oldDebt: order.oldDebt || 0,
       salesAmount: totalAmount,
-      collectedAmount: decreaseAmount,
-      finalDebt: (order.oldDebt || 0) + totalAmount - decreaseAmount,
-      currentDebt: (order.oldDebt || 0) + totalAmount - decreaseAmount,
+      collectedAmount: paid,
+      finalDebt: (order.oldDebt || 0) + totalAmount - paid,
+      currentDebt: (order.oldDebt || 0) + totalAmount - paid,
       status: 'active',
     };
     distStore.addDistributor(newDist);
     dist = newDist;
   }
 
-  // 2. Tính công nợ cũ trước đơn này
-  const oldDebtVal =
-    order.oldDebt !== undefined ? order.oldDebt : dist?.finalDebt ?? dist?.currentDebt ?? dist?.oldDebt ?? 0;
-  const increaseAmount = totalAmount;
-  const finalDebt = oldDebtVal + increaseAmount - decreaseAmount;
-  const isoDate = normalizeToISODate(order.orderDate);
-
-  // 3. Tìm bản ghi công nợ tương ứng
-  const refCode = previousCode || order.code;
-  const existingRecordIndex = debtStore.records.findIndex(
-    (r) =>
-      (refCode && r.referenceCode === refCode) ||
-      r.id === `debt-dh-${order.id}` ||
-      r.id === `debt-order-${order.id}` ||
-      (order.code && r.referenceCode === order.code),
-  );
-
-  const isThuOnly = totalAmount === 0 && decreaseAmount > 0;
-  const debtRecord: DebtDailyRecord = {
-    id: existingRecordIndex >= 0 ? debtStore.records[existingRecordIndex].id : `debt-dh-${order.id}`,
-    date: isoDate,
-    partnerType: 'npp',
-    partnerId: dist?.id || order.distributorId || `npp-auto-${Date.now()}`,
-    partnerCode: dist?.code || 'NPP-LE',
-    partnerName: order.distributorName,
-    phone: order.phone || dist?.phone || '',
-    entryType: 'order',
-    type: isThuOnly ? 'thu' : 'chi',
-    amount: totalAmount || decreaseAmount || 0,
-    remainingDebt: finalDebt,
-    oldDebt: oldDebtVal,
-    increaseAmount,
-    decreaseAmount,
-    finalDebt,
-    referenceCode: order.code,
-    notes: order.notes ? `Đơn hàng ${order.code}: ${order.notes}` : `Đơn hàng ${order.code}`,
-    creator: order.creator || 'Admin',
-  };
-
-  if (existingRecordIndex >= 0) {
-    const updatedRecords = [...debtStore.records];
-    updatedRecords[existingRecordIndex] = debtRecord;
-    useDebtStore.setState({ records: updatedRecords });
-  } else {
-    useDebtStore.setState({ records: [debtRecord, ...debtStore.records] });
-  }
-
-  // 4. Đồng bộ tổng công nợ vào useDistributorStore
   recalcDistributorDebts(dist?.id || order.distributorId);
 }
 
 /**
- * Xóa bản ghi công nợ khi xóa đơn hàng bán
+ * Xóa đơn hàng bán → bỏ dòng công nợ đã lưu của đơn (nếu còn) và tính lại NPP
  */
 export function removeOrderFromDebt(orderCode: string, orderId?: string, distId?: string) {
-  const debtStore = useDebtStore.getState();
-  const nextRecords = debtStore.records.filter(
-    (r) =>
-      r.referenceCode !== orderCode &&
-      r.id !== `debt-dh-${orderId}` &&
-      r.id !== `debt-order-${orderId}`,
-  );
-  useDebtStore.setState({ records: nextRecords });
+  purgeOrderDerivedRecords(new Set([orderCode].filter(Boolean)), new Set([orderId].filter(Boolean) as string[]));
   if (distId) {
     recalcDistributorDebts(distId);
   }
@@ -1328,15 +1319,16 @@ export function recalcAllSuppliersDebts() {
 }
 
 /**
- * Tự động đồng bộ đơn nhập NCC vào Quản lý Công nợ theo ngày & Cập nhật NCC
+ * Đơn nhập NCC thay đổi → công nợ NCC tự đổi theo (cột ảo, không lưu dòng công nợ)
  */
 export function syncSupplierOrderToDebt(order: SupplierOrder, previousCode?: string) {
-  const debtStore = useDebtStore.getState();
   const supStore = useSupplierStore.getState();
 
-  // Đơn hủy thì tự động loại bỏ khỏi công nợ
+  const codes = new Set([order.code, previousCode].filter(Boolean) as string[]);
+  purgeOrderDerivedRecords(codes, new Set([order.id]));
+
   if (order.status === 'huy') {
-    removeSupplierOrderFromDebt(order.code, order.id, order.supplierId);
+    recalcSupplierDebts(order.supplierId);
     return;
   }
 
@@ -1346,14 +1338,9 @@ export function syncSupplierOrderToDebt(order: SupplierOrder, previousCode?: str
       (s.name && s.name.trim().toLowerCase() === order.supplierName.trim().toLowerCase()),
   );
 
-  const itemsSubtotal = (order.items || []).reduce(
-    (sum, i) => sum + (i.amount || ((i.quantity || 0) * (i.costPrice || 0))),
-    0
-  );
-  const totalAmount = order.totalAmount || (itemsSubtotal > 0 ? (itemsSubtotal + (order.shippingFee || 0) - (order.discount || 0)) : 0);
-  const decreaseAmount = order.paidAmount || 0;
-
   if (!supplier && order.supplierName.trim()) {
+    const totalAmount = getOrderTotal(order, 'costPrice');
+    const paid = order.paidAmount || 0;
     const newSup: Supplier = {
       id: order.supplierId || `ncc-${Date.now()}`,
       code: `NCC-${(supStore.suppliers.length + 1).toString().padStart(3, '0')}`,
@@ -1366,253 +1353,51 @@ export function syncSupplierOrderToDebt(order: SupplierOrder, previousCode?: str
       rating: 5,
       oldDebt: 0,
       importAmount: totalAmount,
-      paidAmount: decreaseAmount,
-      finalDebt: totalAmount - decreaseAmount,
-      totalDebt: totalAmount - decreaseAmount,
+      paidAmount: paid,
+      finalDebt: totalAmount - paid,
+      totalDebt: totalAmount - paid,
       status: 'active',
     };
     supStore.addSupplier(newSup);
     supplier = newSup;
   }
 
-  const oldDebtVal = supplier?.finalDebt ?? supplier?.totalDebt ?? supplier?.oldDebt ?? 0;
-  const increaseAmount = totalAmount;
-  const finalDebt = oldDebtVal + increaseAmount - decreaseAmount;
-  const isoDate = normalizeToISODate(order.orderDate);
-
-  const refCode = previousCode || order.code;
-  const existingRecordIndex = debtStore.records.findIndex(
-    (r) =>
-      (refCode && r.referenceCode === refCode) ||
-      r.id === `debt-ncc-${order.id}` ||
-      (order.code && r.referenceCode === order.code),
-  );
-
-  const isThuOnly = (order.totalAmount || 0) === 0 && (order.paidAmount || 0) > 0;
-  const debtRecord: DebtDailyRecord = {
-    id: existingRecordIndex >= 0 ? debtStore.records[existingRecordIndex].id : `debt-ncc-${order.id}`,
-    date: isoDate,
-    partnerType: 'ncc',
-    partnerId: supplier?.id || order.supplierId || `ncc-auto-${Date.now()}`,
-    partnerCode: supplier?.code || 'NCC-LE',
-    partnerName: order.supplierName,
-    phone: order.phone || supplier?.phone || '',
-    entryType: 'order',
-    type: isThuOnly ? 'thu' : 'chi',
-    amount: order.totalAmount || order.paidAmount || 0,
-    remainingDebt: finalDebt,
-    oldDebt: oldDebtVal,
-    increaseAmount,
-    decreaseAmount,
-    finalDebt,
-    referenceCode: order.code,
-    notes: order.notes ? `Đơn nhập NCC ${order.code}: ${order.notes}` : `Đơn nhập NCC ${order.code}`,
-    creator: order.creator || 'Admin',
-  };
-
-  if (existingRecordIndex >= 0) {
-    const updatedRecords = [...debtStore.records];
-    updatedRecords[existingRecordIndex] = debtRecord;
-    useDebtStore.setState({ records: updatedRecords });
-  } else {
-    useDebtStore.setState({ records: [debtRecord, ...debtStore.records] });
-  }
-
   recalcSupplierDebts(supplier?.id || order.supplierId);
 }
 
 /**
- * Xóa bản ghi công nợ khi xóa đơn nhập NCC
+ * Xóa đơn nhập NCC → bỏ dòng công nợ đã lưu của đơn (nếu còn) và tính lại NCC
  */
 export function removeSupplierOrderFromDebt(orderCode: string, orderId?: string, supplierId?: string) {
-  const debtStore = useDebtStore.getState();
-  const nextRecords = debtStore.records.filter(
-    (r) =>
-      r.referenceCode !== orderCode &&
-      r.id !== `debt-ncc-${orderId}`,
-  );
-  useDebtStore.setState({ records: nextRecords });
+  purgeOrderDerivedRecords(new Set([orderCode].filter(Boolean)), new Set([orderId].filter(Boolean) as string[]));
   if (supplierId) {
     recalcSupplierDebts(supplierId);
   }
 }
 
 /**
- * Tự động đồng bộ toàn bộ đơn hàng bán và đơn nhập NCC hiện có vào sổ công nợ
- * Đảm bảo nguyên tắc: Đơn hàng có đơn thì công nợ cũng tự động có dữ liệu tương ứng.
+ * Đồng bộ toàn bộ đơn hàng bán & đơn nhập NCC với sổ công nợ.
+ * Công nợ của đơn là CỘT ẢO (xem src/lib/virtualDebt.ts) nên ở đây chỉ:
+ *  - bỏ các dòng công nợ đã lưu sinh ra từ đơn (dữ liệu cũ / tải từ Google Sheets)
+ *  - tính lại công nợ cho toàn bộ NPP & NCC
  */
-export function syncAllOrdersToDebtRecords(): { syncedNPP: number; syncedNCC: number; newAdded: number } {
-  const orderStore = useOrderStore.getState();
-  const supOrderStore = useSupplierOrderStore.getState();
-  const debtStore = useDebtStore.getState();
-  const distStore = useDistributorStore.getState();
-  const supStore = useSupplierStore.getState();
+export function syncAllOrdersToDebtRecords(): { syncedNPP: number; syncedNCC: number; newAdded: number; removed: number } {
+  const orders = useOrderStore.getState().orders;
+  const supplierOrders = useSupplierOrderStore.getState().orders;
 
-  const currentRecords = [...debtStore.records];
-  const recordMapByRef = new Map<string, number>();
-  const recordMapById = new Map<string, number>();
+  const codes = new Set<string>();
+  orders.forEach((o) => o.code && codes.add(o.code.trim()));
+  supplierOrders.forEach((o) => o.code && codes.add(o.code.trim()));
 
-  currentRecords.forEach((r, idx) => {
-    if (r.referenceCode) recordMapByRef.set(r.referenceCode, idx);
-    recordMapById.set(r.id, idx);
-  });
+  const records = useDebtStore.getState().records;
+  const kept = records.filter((r) => !isOrderDerivedDebtRecord(r, codes));
+  const removed = records.length - kept.length;
+  if (removed > 0) useDebtStore.setState({ records: kept });
 
-  let hasChange = false;
-  const newRecords: DebtDailyRecord[] = [];
+  recalcAllDistributorsDebts();
+  recalcAllSuppliersDebts();
 
-  // 1. Quét và đồng bộ từng đơn hàng bán
-  for (const order of orderStore.orders) {
-    if (order.status === 'huy' || order.status === 'cancelled') continue;
-
-    const normDistName = order.distributorName ? order.distributorName.trim().toLowerCase() : '';
-    const dist = distStore.distributors.find(
-      (d) =>
-        (order.distributorId && d.id === order.distributorId) ||
-        (d.name && d.name.trim().toLowerCase() === normDistName),
-    );
-
-    const itemsSubtotal = (order.items || []).reduce(
-      (sum, i) => sum + (i.amount || ((i.quantity || 0) * (i.unitPrice || 0))),
-      0,
-    );
-    const totalAmount = order.totalAmount || (itemsSubtotal > 0 ? (itemsSubtotal + (order.shippingFee || 0) - (order.discount || 0)) : 0);
-    const decreaseAmount = order.paidAmount || 0;
-    const increaseAmount = totalAmount;
-    const oldDebtVal = order.oldDebt !== undefined ? order.oldDebt : (dist?.oldDebt || 0);
-    const finalDebt = oldDebtVal + increaseAmount - decreaseAmount;
-    const isoDate = normalizeToISODate(order.orderDate);
-    const isThuOnly = totalAmount === 0 && decreaseAmount > 0;
-
-    const existingIdx =
-      (order.code ? recordMapByRef.get(order.code) : undefined) ??
-      recordMapById.get(`debt-dh-${order.id}`) ??
-      recordMapById.get(`debt-order-${order.id}`);
-
-    const debtRecord: DebtDailyRecord = {
-      id: existingIdx !== undefined ? currentRecords[existingIdx].id : `debt-dh-${order.id}`,
-      date: isoDate,
-      partnerType: 'npp',
-      partnerId: dist?.id || order.distributorId || `npp-auto-${Date.now()}`,
-      partnerCode: dist?.code || 'NPP-LE',
-      partnerName: order.distributorName,
-      phone: order.phone || dist?.phone || '',
-      entryType: 'order',
-      type: isThuOnly ? 'thu' : 'chi',
-      amount: totalAmount || decreaseAmount || 0,
-      remainingDebt: finalDebt,
-      oldDebt: oldDebtVal,
-      increaseAmount,
-      decreaseAmount,
-      finalDebt,
-      referenceCode: order.code,
-      notes: order.notes ? `Đơn hàng ${order.code}: ${order.notes}` : `Đơn hàng ${order.code}`,
-      creator: order.creator || 'Admin',
-    };
-
-    if (existingIdx !== undefined) {
-      const prev = currentRecords[existingIdx];
-      if (
-        prev.amount !== debtRecord.amount ||
-        prev.increaseAmount !== debtRecord.increaseAmount ||
-        prev.decreaseAmount !== debtRecord.decreaseAmount ||
-        prev.date !== debtRecord.date ||
-        prev.partnerName !== debtRecord.partnerName ||
-        prev.referenceCode !== debtRecord.referenceCode
-      ) {
-        currentRecords[existingIdx] = { ...prev, ...debtRecord };
-        hasChange = true;
-      }
-    } else {
-      newRecords.push(debtRecord);
-      hasChange = true;
-      if (debtRecord.referenceCode) {
-        recordMapByRef.set(debtRecord.referenceCode, currentRecords.length + newRecords.length - 1);
-      }
-      recordMapById.set(debtRecord.id, currentRecords.length + newRecords.length - 1);
-    }
-  }
-
-  // 2. Quét và đồng bộ từng đơn nhập NCC
-  for (const po of supOrderStore.orders) {
-    if (po.status === 'huy') continue;
-
-    const normSupName = po.supplierName ? po.supplierName.trim().toLowerCase() : '';
-    const supplier = supStore.suppliers.find(
-      (s) =>
-        (po.supplierId && s.id === po.supplierId) ||
-        (s.name && s.name.trim().toLowerCase() === normSupName),
-    );
-
-    const itemsSubtotal = (po.items || []).reduce(
-      (sum, i) => sum + (i.amount || ((i.quantity || 0) * (i.costPrice || 0))),
-      0,
-    );
-    const totalAmount = po.totalAmount || (itemsSubtotal > 0 ? (itemsSubtotal + (po.shippingFee || 0) - (po.discount || 0)) : 0);
-    const decreaseAmount = po.paidAmount || 0;
-    const increaseAmount = totalAmount;
-    const oldDebtVal = supplier?.oldDebt || 0;
-    const finalDebt = oldDebtVal + increaseAmount - decreaseAmount;
-    const isoDate = normalizeToISODate(po.orderDate);
-
-    const existingIdx =
-      (po.code ? recordMapByRef.get(po.code) : undefined) ??
-      recordMapById.get(`debt-ncc-${po.id}`);
-
-    const debtRecord: DebtDailyRecord = {
-      id: existingIdx !== undefined ? currentRecords[existingIdx].id : `debt-ncc-${po.id}`,
-      date: isoDate,
-      partnerType: 'ncc',
-      partnerId: supplier?.id || po.supplierId || `ncc-auto-${Date.now()}`,
-      partnerCode: supplier?.code || 'NCC-LE',
-      partnerName: po.supplierName,
-      entryType: 'order',
-      type: 'chi',
-      amount: totalAmount || decreaseAmount || 0,
-      remainingDebt: finalDebt,
-      oldDebt: oldDebtVal,
-      increaseAmount,
-      decreaseAmount,
-      finalDebt,
-      referenceCode: po.code,
-      notes: po.notes ? `Đơn nhập NCC ${po.code}: ${po.notes}` : `Đơn nhập NCC ${po.code}`,
-      creator: po.creator || 'Admin',
-    };
-
-    if (existingIdx !== undefined) {
-      const prev = currentRecords[existingIdx];
-      if (
-        prev.amount !== debtRecord.amount ||
-        prev.increaseAmount !== debtRecord.increaseAmount ||
-        prev.decreaseAmount !== debtRecord.decreaseAmount ||
-        prev.date !== debtRecord.date ||
-        prev.partnerName !== debtRecord.partnerName ||
-        prev.referenceCode !== debtRecord.referenceCode
-      ) {
-        currentRecords[existingIdx] = { ...prev, ...debtRecord };
-        hasChange = true;
-      }
-    } else {
-      newRecords.push(debtRecord);
-      hasChange = true;
-      if (debtRecord.referenceCode) {
-        recordMapByRef.set(debtRecord.referenceCode, currentRecords.length + newRecords.length - 1);
-      }
-      recordMapById.set(debtRecord.id, currentRecords.length + newRecords.length - 1);
-    }
-  }
-
-  if (hasChange) {
-    const finalRecords = [...newRecords, ...currentRecords];
-    useDebtStore.setState({ records: finalRecords });
-    recalcAllDistributorsDebts();
-    recalcAllSuppliersDebts();
-  }
-
-  return {
-    syncedNPP: orderStore.orders.length,
-    syncedNCC: supOrderStore.orders.length,
-    newAdded: newRecords.length,
-  };
+  return { syncedNPP: orders.length, syncedNCC: supplierOrders.length, newAdded: 0, removed };
 }
 
 /**

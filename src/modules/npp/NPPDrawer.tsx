@@ -17,13 +17,13 @@ import { Button } from '@/components/ui/Button';
 import { Drawer } from '@/components/ui/Drawer';
 import {
   normalizeToISODate,
-  useDebtStore,
   useDistributorStore,
   useOrderStore,
 } from '@/stores/hoaKhangThanhStore';
 import type { Distributor, Order } from '@/types/hoaKhangThanh';
 import { formatDate } from '@/lib/format';
 import { getDaysDifference } from '@/lib/debtCheck';
+import { useAllDebtRecords } from '@/lib/virtualDebt';
 import { DonHangDetailModal } from '../don-hang/DonHangDetailModal';
 
 interface Props {
@@ -57,7 +57,8 @@ const ORDER_STATUS_LABELS: Record<string, { label: string; cls: string }> = {
 export function NPPDrawer({ isOpen, onClose, distributor, mode = 'create' }: Props) {
   const { addDistributor, updateDistributor, distributors } = useDistributorStore();
   const { orders } = useOrderStore();
-  const { records } = useDebtStore();
+  // Lịch sử công nợ: dòng ảo từ đơn hàng + dòng nhập tay
+  const records = useAllDebtRecords();
 
   const [code, setCode] = useState('');
   const [name, setName] = useState('');

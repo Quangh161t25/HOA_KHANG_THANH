@@ -1,5 +1,5 @@
 import type { DebtDailyRecord, Order } from '@/types/hoaKhangThanh';
-import { useDebtStore } from '@/stores/hoaKhangThanhStore';
+import { getOrderTotal, useDebtStore } from '@/stores/hoaKhangThanhStore';
 
 export interface OverdueDebtRecord {
   id: string;
@@ -141,7 +141,7 @@ export function checkCustomerOverdueDebt(
 
   // Tổng tiền khách đã thanh toán qua mọi kênh (Đơn hàng + Thu nợ từ sổ công nợ)
   const totalPastPaid = totalPastPaidFromOrders + totalDebtStorePayments;
-  const totalPastOrdersAmount = pastOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+  const totalPastOrdersAmount = pastOrders.reduce((sum, o) => sum + getOrderTotal(o), 0);
 
   // 2. Tìm thêm các khoản nợ thủ công (nếu có trong useDebtStore với type === 'chi' không thuộc đơn hàng nào)
   const manualDebtRecords = allDebtRecords.filter((r) => {
@@ -171,7 +171,7 @@ export function checkCustomerOverdueDebt(
       id: o.id,
       code: o.code,
       orderDate: o.orderDate,
-      totalAmount: o.totalAmount || 0,
+      totalAmount: getOrderTotal(o),
     })),
     ...manualDebtRecords.map((r) => ({
       id: r.id,

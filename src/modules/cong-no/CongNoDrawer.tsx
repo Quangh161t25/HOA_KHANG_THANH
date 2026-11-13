@@ -428,7 +428,8 @@ export function CongNoDrawer({
             </button>
             <button
               type="button"
-              disabled={isView}
+              disabled={isView || mode === 'create'}
+              title={mode === 'create' ? 'Công nợ theo đơn tự lấy từ Đơn hàng / Đơn nhập NCC, không cần tạo tay' : undefined}
               onClick={() => setEntryType('order')}
               className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-semibold transition-all ${
                 entryType === 'order'

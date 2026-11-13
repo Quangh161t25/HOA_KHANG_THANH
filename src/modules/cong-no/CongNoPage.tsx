@@ -35,6 +35,7 @@ import {
 import type { DebtDailyRecord } from '@/types/hoaKhangThanh';
 import { formatDate, todayISODate } from '@/lib/format';
 import { CongNoDrawer } from './CongNoDrawer';
+import { useAllDebtRecords } from '@/lib/virtualDebt';
 import { CongNoStats } from './CongNoStats';
 
 type Tab = 'npp' | 'ncc' | 'tonghop' | 'thongke' | 'lichsu';
@@ -75,7 +76,9 @@ const NCC_COLUMNS: ColumnDef[] = [
 ];
 
 export default function CongNoPage() {
-  const { records, deleteRecord } = useDebtStore();
+  // Dòng ảo từ Đơn hàng / Đơn nhập NCC + dòng nhập tay đã lưu
+  const records = useAllDebtRecords();
+  const { records: manualRecords, deleteRecord } = useDebtStore();
   const { distributors } = useDistributorStore();
   const { suppliers } = useSupplierStore();
 
@@ -116,11 +119,21 @@ export default function CongNoPage() {
 
   const handleSyncFromOrders = () => {
     const res = syncAllOrdersToDebtRecords();
-    if (res.newAdded > 0) {
-      toast.success(`Đã đồng bộ tự động ${res.newAdded} đơn hàng mới vào sổ công nợ!`);
-    } else {
-      toast.success(`Tất cả đơn hàng (${res.syncedNPP} đơn bán, ${res.syncedNCC} đơn nhập) đã được đồng bộ chuẩn xác với sổ công nợ.`);
-    }
+    toast.success(
+      `Công nợ đã khớp với ${res.syncedNPP} đơn bán và ${res.syncedNCC} đơn nhập (tự tính từ đơn hàng)` +
+        (res.removed > 0 ? ` • đã bỏ ${res.removed} dòng công nợ cũ trùng với đơn` : ''),
+    );
+  };
+
+  // Dòng lấy từ đơn hàng (cột ảo) → không sửa / xóa ở Công nợ
+  const isLocked = (r: DebtDailyRecord) => Boolean(r.isVirtual || r.childRecords?.some((c) => c.isVirtual));
+  const lockedMessage = (r: DebtDailyRecord) => {
+    const codes = (r.childRecords?.length ? r.childRecords : [r])
+      .filter((c) => c.isVirtual)
+      .map((c) => c.referenceCode)
+      .filter(Boolean);
+    const list = Array.from(new Set(codes)).slice(0, 3).join(', ');
+    return `Công nợ của đơn ${list} tự lấy từ ${r.partnerType === 'ncc' ? 'Đơn nhập NCC' : 'Đơn hàng'}. Muốn đổi thì sửa trong ${r.partnerType === 'ncc' ? 'Đơn nhập NCC' : 'Đơn hàng'}.`;
   };
 
   // Switch columns when tab changes
@@ -438,10 +451,20 @@ export default function CongNoPage() {
   };
 
   const handleDeleteMany = () => {
-    if (confirm(`Bạn có chắc muốn xóa ${selectedIds.size} bản ghi công nợ đã chọn?`)) {
-      selectedIds.forEach((id) => deleteRecord(id));
+    // Chỉ xóa được dòng nhập tay; dòng từ đơn hàng (cột ảo) bỏ qua
+    const manualIds = new Set(manualRecords.map((r) => r.id));
+    const ids = new Set<string>();
+    filteredData
+      .filter((r) => selectedIds.has(r.id))
+      .forEach((r) => (r.childRecords?.length ? r.childRecords : [r]).forEach((c) => manualIds.has(c.id) && ids.add(c.id)));
+    if (ids.size === 0) {
+      toast.error('Các dòng đã chọn đều lấy từ đơn hàng nên không xóa được ở Công nợ. Hãy sửa / hủy trong Đơn hàng.');
+      return;
+    }
+    if (confirm(`Xóa ${ids.size} bản ghi công nợ nhập tay đã chọn? (Dòng lấy từ đơn hàng sẽ được giữ nguyên)`)) {
+      ids.forEach((id) => deleteRecord(id));
       setSelectedIds(new Set());
-      toast.success('Đã xóa các bản ghi công nợ đã chọn');
+      toast.success(`Đã xóa ${ids.size} bản ghi công nợ nhập tay`);
     }
   };
 
@@ -473,6 +496,10 @@ export default function CongNoPage() {
   };
 
   const handleEdit = (r: DebtDailyRecord) => {
+    if (isLocked(r)) {
+      toast.info(lockedMessage(r));
+      return;
+    }
     if (r.childRecords && r.childRecords.length === 1) {
       setSelectedRecord(r.childRecords[0]);
     } else {
@@ -489,6 +516,10 @@ export default function CongNoPage() {
   };
 
   const handleDelete = (r: DebtDailyRecord) => {
+    if (isLocked(r)) {
+      toast.info(lockedMessage(r));
+      return;
+    }
     if (r.childRecords && r.childRecords.length > 1) {
       if (
         confirm(
@@ -669,6 +700,18 @@ export default function CongNoPage() {
       case 'notes':
         return <span className="text-xs text-muted-foreground truncate max-w-[200px]">{row.notes || '—'}</span>;
       case 'actions':
+        if (isLocked(row)) {
+          return (
+            <button
+              type="button"
+              onClick={() => toast.info(lockedMessage(row))}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-muted-foreground bg-muted/70 border border-border"
+              title="Lấy từ đơn hàng — sửa trong Đơn hàng"
+            >
+              🔒 Theo đơn
+            </button>
+          );
+        }
         return (
           <div className="flex items-center gap-1.5">
             <button

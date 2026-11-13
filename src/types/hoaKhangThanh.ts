@@ -222,6 +222,11 @@ export interface DebtDailyRecord {
   creator?: string;
   isAggregated?: boolean; // Bản ghi tổng hợp NPP / NCC theo ngày
   childRecords?: DebtDailyRecord[]; // Danh sách các đơn / chứng từ cấu thành trong ngày
+  /** Dòng ảo: tính từ Đơn hàng / Đơn nhập NCC khi hiển thị, KHÔNG lưu, KHÔNG được sửa/xóa ở Công nợ */
+  isVirtual?: boolean;
+  /** Đơn gốc của dòng ảo */
+  sourceOrderId?: string;
+  sourceKind?: 'order' | 'supplierOrder';
 }
 
 export interface FixedExpensePreset {

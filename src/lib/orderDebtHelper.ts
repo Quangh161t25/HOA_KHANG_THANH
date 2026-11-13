@@ -1,5 +1,5 @@
 import type { DebtDailyRecord, Distributor, Order } from '@/types/hoaKhangThanh';
-import { normalizeToISODate } from '@/stores/hoaKhangThanhStore';
+import { getOrderTotal, normalizeToISODate } from '@/stores/hoaKhangThanhStore';
 import { parseDateTimestamp } from '@/lib/format';
 
 export interface OrderDebtInfo {
@@ -147,7 +147,7 @@ export function computeAllOrdersVirtualDebt(
         date: isoDate,
         dateTime: parseDateTimestamp(isoDate) ?? 0,
         isThu: false,
-        amount: o.totalAmount || 0,
+        amount: getOrderTotal(o),
         paidAmount: o.paidAmount || 0,
         orderId: o.id,
         orderCode: o.code,
@@ -279,7 +279,7 @@ export function getDistributorDebtAsOfDate(
       date: isoDate,
       dateTime: parseDateTimestamp(isoDate) ?? 0,
       isThu: false,
-      amount: o.totalAmount || 0,
+      amount: getOrderTotal(o),
       paidAmount: o.paidAmount || 0,
       orderCode: o.code,
     });

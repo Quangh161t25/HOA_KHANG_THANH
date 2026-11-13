@@ -415,7 +415,11 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
     if (congNoRows.length > 0) {
       const allDistributors = useDistributorStore.getState().distributors;
       const allSuppliers = useSupplierStore.getState().suppliers;
-      const records: DebtDailyRecord[] = congNoRows.filter((r) => r[0] && r[1]).map((r, idx) => {
+      // Bỏ dòng tiêu đề bị lẫn vào dữ liệu ("ngay | khach_hang").
+      // Dòng công nợ của đơn hàng (có mã đơn) sẽ được syncAllOrdersToDebtRecords bỏ ra vì là cột ảo.
+      const records: DebtDailyRecord[] = congNoRows
+        .filter((r) => r[0] && r[1] && !(String(r[0]).trim().toLowerCase() === 'ngay' && String(r[1]).trim().toLowerCase() === 'khach_hang'))
+        .map((r, idx) => {
         const partnerName = String(r[1] || '').trim();
         const isNpp = r[2] === 'NPP';
         const partnerType = (isNpp ? 'npp' : 'ncc') as DebtDailyRecord['partnerType'];

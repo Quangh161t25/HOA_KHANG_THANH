@@ -183,6 +183,18 @@ export async function handleSheetsApi(
             appendDimension: { sheetId: sheet.sheetId, dimension: 'ROWS', length: requiredRows - sheet.gridProperties.rowCount },
           });
         }
+        // Xóa các dòng cũ thừa ở cuối (khi dữ liệu mới ít dòng hơn), chỉ trong các cột của bảng.
+        // Bỏ qua nếu bảng rỗng để tránh xóa trắng sheet khi app chưa có dữ liệu.
+        const width = table.values.reduce((m, row) => Math.max(m, row.length), 0);
+        const hasData = table.values.some((row) => row.some((v) => v !== '' && v !== null && v !== undefined));
+        if (hasData && width > 0 && sheet.gridProperties.rowCount > requiredRows) {
+          requests.push({
+            updateCells: {
+              range: { sheetId: sheet.sheetId, startRowIndex: requiredRows, startColumnIndex: 0, endColumnIndex: width },
+              fields: 'userEnteredValue',
+            },
+          });
+        }
         requests.push({
           updateCells: {
             range: { sheetId: sheet.sheetId, startRowIndex: 1 },

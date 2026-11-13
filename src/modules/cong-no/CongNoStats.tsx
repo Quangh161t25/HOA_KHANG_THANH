@@ -20,7 +20,7 @@ import {
   YAxis,
 } from 'recharts';
 import { ChartCard, StatCard, useChartReady } from '@/components/data/StatsKit';
-import { useDebtStore } from '@/stores/hoaKhangThanhStore';
+import { useAllDebtRecords } from '@/lib/virtualDebt';
 import { formatDate } from '@/lib/format';
 
 const formatNumber = (num?: number) => {
@@ -32,7 +32,7 @@ const tick = { fontSize: 10, fill: 'hsl(var(--muted-foreground))' };
 const PIE_COLORS = ['#8b5cf6', '#10b981', '#f59e0b', '#3b82f6', '#ec4899', '#06b6d4'];
 
 export function CongNoStats() {
-  const { records } = useDebtStore();
+  const records = useAllDebtRecords();
   const ready = useChartReady();
 
   // NPP records and NCC records
