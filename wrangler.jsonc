@@ -1,0 +1,14 @@
+{
+  // Cloudflare Workers: app tĩnh trong dist + API Google Sheets trong worker/index.ts
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hoakhangthanh",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "observability": { "enabled": true }
+}
