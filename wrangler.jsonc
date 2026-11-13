@@ -4,6 +4,9 @@
   "name": "hoakhangthanh",
   "main": "worker/index.ts",
   "compatibility_date": "2025-01-01",
+  // Bật link https://hoakhangthanh.<tài-khoản>.workers.dev
+  "workers_dev": true,
+  "preview_urls": true,
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
