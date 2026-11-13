@@ -1,4 +1,4 @@
-import { actionLabels, pauseModuleAudit, useModuleAuditStore } from '@/stores/moduleAuditStore';
+import { pauseModuleAudit } from '@/stores/moduleAuditStore';
 import { GOOGLE_SHEETS_CONFIG } from '@/config/googleSheetsConfig';
 import { fromSheetDate } from '@/lib/sheetDate';
 import {
@@ -16,7 +16,6 @@ import {
   recalcAllDistributorsDebts,
   recalcAllSuppliersDebts,
 } from '@/stores/hoaKhangThanhStore';
-import { useOrderLogStore } from '@/stores/orderLogStore';
 import type {
   CashTransaction,
   DebtDailyRecord,
@@ -136,17 +135,8 @@ export async function syncAllToGoogleSheets(): Promise<SyncResult> {
     const transactions = useCashStore.getState().transactions;
     const inventory = useInventoryStore.getState().inventory;
     const employees = useEmployeeStore.getState().employees;
-    const auditLogs = [
-      ...useOrderLogStore.getState().logs,
-      ...useModuleAuditStore.getState().logs.map((log) => ({
-        id: log.id, timestamp: log.timestamp, performerName: log.performer,
-        performerCode: log.performerCode, actionLabel: actionLabels[log.action],
-        orderCode: log.record, distributorName: log.module,
-        summary: `${actionLabels[log.action]}: ${log.record}`,
-        details: log.changes.map((c) => `${c.field}: ${c.before} → ${c.after}`).join(' | '),
-      })),
-    ].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
+    // Lịch sử thao tác CHỈ lưu trên web, không ghi lên Google Sheets (sheet LICH_SU_THAO_TAC không còn được cập nhật).
     const payload = {
       orders,
       flowers,
@@ -157,7 +147,6 @@ export async function syncAllToGoogleSheets(): Promise<SyncResult> {
       transactions,
       inventory,
       employees,
-      auditLogs,
     };
 
     const res = await fetch('/api/google-sheets/sync-all', {

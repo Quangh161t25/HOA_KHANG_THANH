@@ -1,5 +1,5 @@
 import { computeAllOrdersVirtualDebt } from '@/lib/orderDebtHelper';
-import { watchModule } from './moduleAuditStore';
+import { pauseModuleAudit, watchModule } from './moduleAuditStore';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { idbJSONStorage } from '@/lib/idbStorage';
@@ -1081,7 +1081,7 @@ export function calculateSupplierFinancials(
 /**
  * Tính toán lại tổng phát sinh và công nợ cuối của Nhà Phân Phối
  */
-export function recalcDistributorDebts(distId?: string) {
+function recalcDistributorDebtsImpl(distId?: string) {
   if (!distId) return;
   const orderStore = useOrderStore.getState();
   const debtStore = useDebtStore.getState();
@@ -1170,6 +1170,8 @@ export function isOrderDerivedDebtRecord(r: DebtDailyRecord, orderCodes: Set<str
 
 /** Bỏ các dòng công nợ đã lưu sinh ra từ các mã đơn cho trước. Trả về số dòng đã bỏ. */
 function purgeOrderDerivedRecords(orderCodes: Set<string>, orderIds: Set<string> = new Set()): number {
+  const resumeAudit = pauseModuleAudit();
+  try {
   const records = useDebtStore.getState().records;
   const next = records.filter((r) => {
     if (
@@ -1183,6 +1185,9 @@ function purgeOrderDerivedRecords(orderCodes: Set<string>, orderIds: Set<string>
   });
   if (next.length !== records.length) useDebtStore.setState({ records: next });
   return records.length - next.length;
+  } finally {
+    resumeAudit();
+  }
 }
 
 /**
@@ -1250,7 +1255,7 @@ export function removeOrderFromDebt(orderCode: string, orderId?: string, distId?
 /**
  * Tính toán lại tổng phát sinh và công nợ cuối của Nhà Cung Cấp
  */
-export function recalcSupplierDebts(supplierId?: string) {
+function recalcSupplierDebtsImpl(supplierId?: string) {
   if (!supplierId) return;
   const supOrderStore = useSupplierOrderStore.getState();
   const debtStore = useDebtStore.getState();
@@ -1272,7 +1277,7 @@ export function recalcSupplierDebts(supplierId?: string) {
 /**
  * Tính toán lại toàn bộ tài chính công nợ cho tất cả Nhà Phân Phối
  */
-export function recalcAllDistributorsDebts() {
+function recalcAllDistributorsDebtsImpl() {
   const orderStore = useOrderStore.getState();
   const debtStore = useDebtStore.getState();
   const distStore = useDistributorStore.getState();
@@ -1297,7 +1302,7 @@ export function recalcAllDistributorsDebts() {
 /**
  * Tính toán lại toàn bộ tài chính công nợ cho tất cả Nhà Cung Cấp
  */
-export function recalcAllSuppliersDebts() {
+function recalcAllSuppliersDebtsImpl() {
   const supOrderStore = useSupplierOrderStore.getState();
   const debtStore = useDebtStore.getState();
   const supStore = useSupplierStore.getState();
@@ -1381,7 +1386,7 @@ export function removeSupplierOrderFromDebt(orderCode: string, orderId?: string,
  *  - bỏ các dòng công nợ đã lưu sinh ra từ đơn (dữ liệu cũ / tải từ Google Sheets)
  *  - tính lại công nợ cho toàn bộ NPP & NCC
  */
-export function syncAllOrdersToDebtRecords(): { syncedNPP: number; syncedNCC: number; newAdded: number; removed: number } {
+function syncAllOrdersToDebtRecordsImpl(): { syncedNPP: number; syncedNCC: number; newAdded: number; removed: number } {
   const orders = useOrderStore.getState().orders;
   const supplierOrders = useSupplierOrderStore.getState().orders;
 
@@ -1456,3 +1461,33 @@ watchModule(useEmployeeStore, (state) => state.employees, 'nhan-vien', (row) => 
 watchModule(useCashStore, (state) => state.transactions, 'thu-chi', (row) => row.id);
 watchModule(useFixedExpenseStore, (state) => state.presets, 'thu-chi', (row) => row.id);
 watchModule(useDebtStore, (state) => state.records, 'cong-no', (row) => row.id);
+
+// ---- Các hàm tự tính công nợ: KHÔNG ghi lịch sử thao tác (không phải người dùng thao tác) ----
+function withoutAudit<T>(fn: () => T): T {
+  const resume = pauseModuleAudit();
+  try {
+    return fn();
+  } finally {
+    resume();
+  }
+}
+
+export function recalcDistributorDebts(distId?: string): void {
+  return withoutAudit(() => recalcDistributorDebtsImpl(distId));
+}
+
+export function recalcSupplierDebts(supplierId?: string): void {
+  return withoutAudit(() => recalcSupplierDebtsImpl(supplierId));
+}
+
+export function recalcAllDistributorsDebts(): void {
+  return withoutAudit(() => recalcAllDistributorsDebtsImpl());
+}
+
+export function recalcAllSuppliersDebts(): void {
+  return withoutAudit(() => recalcAllSuppliersDebtsImpl());
+}
+
+export function syncAllOrdersToDebtRecords(): ReturnType<typeof syncAllOrdersToDebtRecordsImpl> {
+  return withoutAudit(() => syncAllOrdersToDebtRecordsImpl());
+}

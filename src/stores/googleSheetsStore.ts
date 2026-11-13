@@ -1,5 +1,3 @@
-import { useModuleAuditStore } from './moduleAuditStore';
-import { useOrderLogStore } from './orderLogStore';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import {
@@ -208,6 +206,7 @@ export const useGoogleSheetsStore = create<GoogleSheetsState>()(
 let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let isInitialized = false;
 let applyingRemoteData = false;
+let initialPullDone = false;
 
 /**
  * Tự động đồng bộ lên Google Sheets mỗi khi có thay đổi dữ liệu đơn hàng, hoa, NPP, NCC, thu chi
@@ -218,6 +217,9 @@ export function initGoogleSheetsAutoSync() {
 
   const handleStoreChange = () => {
     if (applyingRemoteData) return;
+    // Google Sheets là chuẩn: chưa tải xong dữ liệu từ Sheets thì KHÔNG đẩy dữ liệu cũ trên web lên
+    // (tránh làm sống lại các dòng vừa xóa trên Sheets).
+    if (!initialPullDone) return;
     const { autoSync, syncToSheets, isSyncing } = useGoogleSheetsStore.getState();
     if (!autoSync) return;
     if (isSyncing) {
@@ -238,23 +240,28 @@ export function initGoogleSheetsAutoSync() {
 
   _startSubscriptions(handleStoreChange);
 
-  // Chỉ tải nền khi trình duyệt rảnh, tránh giật đúng lúc mở trang hoặc biểu mẫu.
+  // Mở web: tải dữ liệu từ Google Sheets TRƯỚC (Sheets là chuẩn), tải xong mới cho phép tự đẩy lên.
+  // Tải lỗi (mất mạng...) thì thử lại sau 30 giây, trong lúc đó không đẩy dữ liệu cũ lên.
   const refreshFromSheets = async () => {
     const { autoSync, pullFromSheets } = useGoogleSheetsStore.getState();
-    if (!autoSync) return;
+    if (!autoSync) {
+      initialPullDone = true;
+      return;
+    }
     applyingRemoteData = true;
+    let ok = false;
     try {
-      await pullFromSheets();
+      ok = Boolean(await pullFromSheets());
+    } catch {
+      ok = false;
     } finally {
       applyingRemoteData = false;
     }
+    if (ok) initialPullDone = true;
+    else window.setTimeout(() => void refreshFromSheets(), 30000);
   };
 
-  if (window.requestIdleCallback) {
-    window.requestIdleCallback(() => void refreshFromSheets(), { timeout: 5000 });
-  } else {
-    window.setTimeout(() => void refreshFromSheets(), 2500);
-  }
+  void refreshFromSheets();
 }
 
 function _startSubscriptions(handleStoreChange: () => void) {
@@ -267,7 +274,6 @@ function _startSubscriptions(handleStoreChange: () => void) {
   useInventoryStore.subscribe(handleStoreChange);
   useEmployeeStore.subscribe(handleStoreChange);
   useSupplierOrderStore.subscribe(handleStoreChange);
-  useModuleAuditStore.subscribe(handleStoreChange);
-  useOrderLogStore.subscribe(handleStoreChange);
+  // Lịch sử thao tác chỉ lưu trên web → thay đổi lịch sử không cần đẩy lên Google Sheets
 }
 
