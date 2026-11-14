@@ -7,8 +7,8 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { EmptyState, Spinner } from '@/components/ui/Feedback';
 import { parseDateTimestamp } from '@/lib/format';
 
-const PAGE_SIZES = [10, 20, 30, 50, 100];
-const PAGE_SIZE_ACCENTS = ['border-l-emerald-400', 'border-l-sky-400', 'border-l-violet-400', 'border-l-amber-400', 'border-l-rose-400', 'border-l-fuchsia-400'];
+export const PAGE_SIZES = [10, 20, 30, 50, 100];
+export const PAGE_SIZE_ACCENTS = ['border-l-emerald-400', 'border-l-sky-400', 'border-l-violet-400', 'border-l-amber-400', 'border-l-rose-400', 'border-l-fuchsia-400'];
 const CHECK_COL = 44;
 const ACTION_COL = 80;
 const DEFAULT_COL = 120;
@@ -26,7 +26,7 @@ export function columnStyle(col: Pick<ColumnDef, 'minWidth' | 'maxWidth' | 'widt
   return style;
 }
 
-function PageSizeSelect({
+export function PageSizeSelect({
   value,
   onChange,
   totalRecords,

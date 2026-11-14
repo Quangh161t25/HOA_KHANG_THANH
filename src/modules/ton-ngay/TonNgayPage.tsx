@@ -3,6 +3,10 @@ import dayjs from 'dayjs';
 import {
   Calendar,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   ClipboardCheck,
   Download,
   Info,
@@ -17,6 +21,8 @@ import {
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
+import { Tooltip } from '@/components/ui/Tooltip';
+import { PageSizeSelect } from '@/components/data/DataTable';
 import { useFlowerStore, useOrderStore, useSupplierOrderStore } from '@/stores/hoaKhangThanhStore';
 import {
   useDailyStockReconcileStore,
@@ -29,6 +35,8 @@ import { todayISODate } from '@/lib/format';
 // Dùng chung 1 bộ định dạng số (toLocaleString tạo Intl mới mỗi lần gọi -> rất chậm khi có hàng nghìn ô)
 const viNumberFormat = new Intl.NumberFormat('vi-VN');
 const fmt = (n: number) => viNumberFormat.format(n || 0);
+
+const pagerBtn = 'h-6 w-6 p-0 border-border rounded hover:bg-primary hover:text-white hover:border-primary transition-all cursor-pointer';
 
 const WEEKDAYS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 const weekdayOf = (ymd: string) => WEEKDAYS[dayjs(ymd).day()] ?? '';
@@ -510,6 +518,101 @@ export default function TonNgayPage() {
     return t;
   }, [filteredDateGroups]);
 
+  // --- Phân trang chuẩn theo tổng số loại hoa ---
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ton_ngay_page_size');
+      return saved ? Number(saved) || 20 : 20;
+    } catch {
+      return 20;
+    }
+  });
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setPage(1);
+    try {
+      localStorage.setItem('ton_ngay_page_size', String(newSize));
+    } catch {}
+  };
+
+  const [editingPage, setEditingPage] = useState(false);
+  const [pageInput, setPageInput] = useState('');
+  const pageInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setPage(1);
+  }, [deferredSearchTerm, fromDate, toDate, quickRange]);
+
+  const totalRows = useMemo(() => {
+    return filteredDateGroups.reduce((acc, g) => acc + g.rows.length, 0);
+  }, [filteredDateGroups]);
+
+  const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
+
+  useEffect(() => {
+    if (page > pageCount && pageCount > 0) {
+      setPage(pageCount);
+    }
+  }, [page, pageCount]);
+
+  const commitPage = useCallback(() => {
+    const n = parseInt(pageInput);
+    if (n >= 1 && n <= pageCount) setPage(n);
+    setEditingPage(false);
+  }, [pageInput, pageCount]);
+
+  interface PagedDateGroup {
+    dateYMD: string;
+    displayDate: string;
+    isToday: boolean;
+    totalRowsInDate: number;
+    subtotal: DateGroupData['subtotal'];
+    isContinuation: boolean;
+    startIndexInDate: number;
+    rows: DailyRow[];
+  }
+
+  const pagedDateGroups = useMemo<PagedDateGroup[]>(() => {
+    if (totalRows === 0) return [];
+
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, totalRows);
+
+    let globalIndex = 0;
+    const result: PagedDateGroup[] = [];
+
+    for (const g of filteredDateGroups) {
+      const groupStart = globalIndex;
+      const groupEnd = globalIndex + g.rows.length;
+      globalIndex = groupEnd;
+
+      if (groupEnd <= startIndex || groupStart >= endIndex) {
+        continue;
+      }
+
+      const sliceStart = Math.max(0, startIndex - groupStart);
+      const sliceEnd = Math.min(g.rows.length, endIndex - groupStart);
+      const sliceRows = g.rows.slice(sliceStart, sliceEnd);
+
+      if (sliceRows.length > 0) {
+        result.push({
+          dateYMD: g.dateYMD,
+          displayDate: g.displayDate,
+          isToday: g.isToday,
+          totalRowsInDate: g.rows.length,
+          subtotal: g.subtotal,
+          isContinuation: sliceStart > 0,
+          startIndexInDate: sliceStart,
+          rows: sliceRows,
+        });
+      }
+    }
+
+    return result;
+  }, [filteredDateGroups, totalRows, page, pageSize]);
+
   const handleClosingStockChange = useCallback(
     (dateYMD: string, item: DailyRow, value: number) => {
       setClosingStock(dateYMD, item.flowerId, Math.max(0, value || 0), {
@@ -730,75 +833,156 @@ export default function TonNgayPage() {
       </div>
 
       {/* Bảng gom nhóm theo ngày (kiểu AppSheet): 1 bảng, mỗi ngày là 1 dòng tiêu đề nhóm */}
-      <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-border bg-card shadow-sm">
-        {filteredDateGroups.length === 0 ? (
-          <div className="py-20 text-center">
-            <Package size={32} className="mx-auto text-muted-foreground/50 mb-2" />
-            <p className="text-sm font-semibold text-foreground">Không có dữ liệu tồn ngày</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {searchTerm ? 'Không tìm thấy hoa phù hợp.' : 'Không có hoa nào có Tồn đầu hoặc Xuất ngày trong khoảng ngày này.'}
-            </p>
-          </div>
-        ) : (
-          <table className="w-full text-xs text-left border-separate border-spacing-0">
-            <thead className="sticky top-0 z-20 text-foreground/80 font-semibold select-none [&_th]:h-9 [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-3">
-              <tr>
-                <th className="text-center w-12">STT</th>
-                <th className="w-28">Mã hoa</th>
-                <th className="min-w-[200px]">Tên hoa</th>
-                <th className="text-right w-28">Tồn đầu</th>
-                <th className="text-right w-28 text-rose-700 dark:text-rose-400">Xuất ngày</th>
-                <th className="text-center w-32 text-amber-800 dark:text-amber-200">Tồn cuối ✎</th>
-                <th className="text-right w-28 text-blue-700 dark:text-blue-400">Nhập</th>
-                <th className="text-right w-28">Thực nhập NCC</th>
-                <th className="text-center w-32">Đối soát NCC</th>
-              </tr>
-            </thead>
-            {filteredDateGroups.map((g) => (
-              <tbody key={g.dateYMD}>
+      <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-auto">
+          {filteredDateGroups.length === 0 ? (
+            <div className="py-20 text-center">
+              <Package size={32} className="mx-auto text-muted-foreground/50 mb-2" />
+              <p className="text-sm font-semibold text-foreground">Không có dữ liệu tồn ngày</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {searchTerm ? 'Không tìm thấy hoa phù hợp.' : 'Không có hoa nào có Tồn đầu hoặc Xuất ngày trong khoảng ngày này.'}
+              </p>
+            </div>
+          ) : (
+            <table className="w-full text-xs text-left border-separate border-spacing-0">
+              <thead className="sticky top-0 z-20 text-foreground/80 font-semibold select-none [&_th]:h-9 [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-3">
                 <tr>
-                  <td
-                    colSpan={9}
-                    className="sticky top-9 z-10 px-3 py-2 bg-slate-100 dark:bg-slate-800 border-b border-border"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-foreground">
-                          {weekdayOf(g.dateYMD)}, {g.displayDate}
-                        </span>
-                        {g.isToday && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-primary/10 text-primary border border-primary/20">
-                            Hôm nay
-                          </span>
-                        )}
-                        <span className="min-w-6 px-2 py-0.5 rounded-full bg-background border border-border text-[11px] font-bold text-muted-foreground text-center">
-                          {g.rows.length}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-[11px] font-semibold">
-                        <span className="text-muted-foreground">
-                          Tồn đầu <b className="text-foreground">{fmt(g.subtotal.opening)}</b>
-                        </span>
-                        <span className="text-rose-600">Xuất -{fmt(g.subtotal.export)}</span>
-                        <span className="text-amber-700 dark:text-amber-300">Tồn cuối {fmt(g.subtotal.closing)}</span>
-                        <span className="text-blue-600">Nhập +{fmt(g.subtotal.calculatedImport)}</span>
-                      </div>
-                    </div>
-                  </td>
+                  <th className="text-center w-12">STT</th>
+                  <th className="w-28">Mã hoa</th>
+                  <th className="min-w-[200px]">Tên hoa</th>
+                  <th className="text-right w-28">Tồn đầu</th>
+                  <th className="text-right w-28 text-rose-700 dark:text-rose-400">Xuất ngày</th>
+                  <th className="text-center w-32 text-amber-800 dark:text-amber-200">Tồn cuối ✎</th>
+                  <th className="text-right w-28 text-blue-700 dark:text-blue-400">Nhập</th>
+                  <th className="text-right w-28">Thực nhập NCC</th>
+                  <th className="text-center w-32">Đối soát NCC</th>
                 </tr>
-                {g.rows.map((item, idx) => (
-                  <DailyStockRow
-                    key={item.key}
-                    idx={idx}
-                    dateYMD={g.dateYMD}
-                    item={item}
-                    onClosingChange={handleClosingStockChange}
-                    onOpenEditOpening={handleOpenEditOpening}
-                  />
-                ))}
-              </tbody>
-            ))}
-          </table>
+              </thead>
+              {pagedDateGroups.map((g) => (
+                <tbody key={g.dateYMD + '_' + g.startIndexInDate}>
+                  <tr>
+                    <td
+                      colSpan={9}
+                      className="sticky top-9 z-10 px-3 py-2 bg-slate-100 dark:bg-slate-800 border-b border-border"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-foreground">
+                            {weekdayOf(g.dateYMD)}, {g.displayDate}
+                          </span>
+                          {g.isToday && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-primary/10 text-primary border border-primary/20">
+                              Hôm nay
+                            </span>
+                          )}
+                          <span
+                            className="min-w-6 px-2 py-0.5 rounded-full bg-background border border-border text-[11px] font-bold text-muted-foreground text-center"
+                            title={`Tổng ${g.totalRowsInDate} loại hoa trong ngày`}
+                          >
+                            {g.totalRowsInDate > g.rows.length
+                              ? `${g.startIndexInDate + 1}–${g.startIndexInDate + g.rows.length}/${g.totalRowsInDate}`
+                              : g.totalRowsInDate}
+                          </span>
+                          {g.isContinuation && (
+                            <span className="text-[10px] text-muted-foreground font-medium italic">
+                              (tiếp theo)
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px] font-semibold">
+                          <span className="text-muted-foreground">
+                            Tồn đầu <b className="text-foreground">{fmt(g.subtotal.opening)}</b>
+                          </span>
+                          <span className="text-rose-600">Xuất -{fmt(g.subtotal.export)}</span>
+                          <span className="text-amber-700 dark:text-amber-300">Tồn cuối {fmt(g.subtotal.closing)}</span>
+                          <span className="text-blue-600">Nhập +{fmt(g.subtotal.calculatedImport)}</span>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                  {g.rows.map((item, idx) => (
+                    <DailyStockRow
+                      key={item.key}
+                      idx={g.startIndexInDate + idx}
+                      dateYMD={g.dateYMD}
+                      item={item}
+                      onClosingChange={handleClosingStockChange}
+                      onOpenEditOpening={handleOpenEditOpening}
+                    />
+                  ))}
+                </tbody>
+              ))}
+            </table>
+          )}
+        </div>
+
+        {/* Thanh phân trang đồng bộ với các module khác */}
+        {totalRows > 0 && (
+          <div className="border-t border-border bg-card md:bg-muted/10 px-3 sm:px-4 py-1.5 flex items-center justify-between gap-2 shrink-0 select-none">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+              <span className="tabular-nums">
+                <span className="font-medium text-foreground">
+                  {Math.min((page - 1) * pageSize + 1, totalRows)}–{Math.min(page * pageSize, totalRows)}
+                </span>
+                <span className="text-muted-foreground/60">/Tổng:</span>
+                <span className="font-semibold text-foreground">{totalRows}</span>
+              </span>
+              <div className="flex items-center border-l border-border pl-2">
+                <PageSizeSelect value={pageSize} onChange={handlePageSizeChange} totalRecords={totalRows} className="hidden sm:inline-flex" />
+                <PageSizeSelect value={pageSize} onChange={handlePageSizeChange} totalRecords={totalRows} perPageLabel="" compact className="sm:hidden" />
+              </div>
+            </div>
+            <div className="flex items-center gap-0.5">
+              <Tooltip content="Trang đầu" placement="top">
+                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(1)} className={pagerBtn}>
+                  <ChevronsLeft size={13} />
+                </Button>
+              </Tooltip>
+              <Tooltip content="Trang trước" placement="top">
+                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)} className={pagerBtn}>
+                  <ChevronLeft size={13} />
+                </Button>
+              </Tooltip>
+              <Tooltip content="Nhấn đúp để nhập trang" placement="top">
+                <div className="flex items-center gap-0.5 px-1">
+                  {editingPage ? (
+                    <input
+                      ref={pageInputRef}
+                      value={pageInput}
+                      onChange={(e) => setPageInput(e.target.value.replace(/\D/g, ''))}
+                      onBlur={commitPage}
+                      onKeyDown={(e) => e.key === 'Enter' && commitPage()}
+                      className="h-6 w-10 text-center text-xs font-bold border border-primary rounded bg-background text-foreground outline-none tabular-nums"
+                      autoFocus
+                    />
+                  ) : (
+                    <span
+                      onDoubleClick={() => {
+                        setEditingPage(true);
+                        setPageInput(String(page));
+                        setTimeout(() => pageInputRef.current?.select(), 50);
+                      }}
+                      className="h-6 min-w-[24px] flex items-center justify-center rounded bg-primary text-white text-xs font-bold px-1 tabular-nums cursor-default"
+                    >
+                      {page}
+                    </span>
+                  )}
+                  <span className="text-muted-foreground/40 text-xs">/</span>
+                  <span className="text-xs font-medium text-muted-foreground tabular-nums">{pageCount || 1}</span>
+                </div>
+              </Tooltip>
+              <Tooltip content="Trang sau" placement="top">
+                <Button variant="outline" size="sm" disabled={page >= pageCount} onClick={() => setPage(page + 1)} className={pagerBtn}>
+                  <ChevronRight size={13} />
+                </Button>
+              </Tooltip>
+              <Tooltip content="Trang cuối" placement="top">
+                <Button variant="outline" size="sm" disabled={page >= pageCount} onClick={() => setPage(pageCount)} className={pagerBtn}>
+                  <ChevronsRight size={13} />
+                </Button>
+              </Tooltip>
+            </div>
+          </div>
         )}
       </div>
 
