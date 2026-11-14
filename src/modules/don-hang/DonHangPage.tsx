@@ -43,15 +43,16 @@ const INITIAL_COLUMNS: ColumnDef[] = [
   { id: 'code', label: 'ID đơn hàng', visible: true, minWidth: 110, width: 120, order: 0 },
   { id: 'orderDate', label: 'Ngày đặt', visible: true, minWidth: 100, width: 105, order: 1 },
   { id: 'partner', label: 'NPP / Khách hàng', visible: true, minWidth: 180, width: 200, order: 2 },
-  { id: 'totalQuantity', label: 'Số lượng hoa', visible: true, minWidth: 100, width: 115, order: 3 },
-  { id: 'itemsSubtotal', label: 'Thành tiền', visible: true, minWidth: 115, width: 125, order: 4 },
-  { id: 'shippingFee', label: 'Cước xe', visible: true, minWidth: 95, width: 105, order: 5 },
-  { id: 'discount', label: 'Trừ hàng', visible: true, minWidth: 95, width: 105, order: 6 },
-  { id: 'totalAmount', label: 'Tổng tiền', visible: true, minWidth: 120, width: 130, order: 7 },
-  { id: 'debt', label: 'Công nợ cũ', visible: true, minWidth: 110, width: 120, order: 8 },
-  { id: 'totalPayment', label: 'Thanh toán', visible: true, minWidth: 120, width: 130, order: 9 },
-  { id: 'status', label: 'Trạng thái', visible: true, minWidth: 110, width: 120, order: 10 },
-  { id: 'actions', label: 'Thao tác', visible: true, minWidth: 80, width: 85, order: 11 },
+  { id: 'itemsSubtotal', label: 'Thành tiền', visible: true, minWidth: 115, width: 125, order: 3 },
+  { id: 'shippingFee', label: 'Cước xe', visible: true, minWidth: 95, width: 105, order: 4 },
+  { id: 'discount', label: 'Trừ hàng', visible: true, minWidth: 95, width: 105, order: 5 },
+  { id: 'totalAmount', label: 'Tổng tiền', visible: true, minWidth: 120, width: 130, order: 6 },
+  { id: 'debt', label: 'Công nợ cũ', visible: true, minWidth: 110, width: 120, order: 7 },
+  { id: 'totalPayment', label: 'Thanh toán', visible: true, minWidth: 120, width: 130, order: 8 },
+  { id: 'status', label: 'Trạng thái', visible: true, minWidth: 110, width: 120, order: 9 },
+  { id: 'creator', label: 'Người tạo đơn', visible: true, minWidth: 115, width: 125, order: 10 },
+  { id: 'totalQuantity', label: 'Số lượng hoa', visible: true, minWidth: 100, width: 115, order: 11 },
+  { id: 'actions', label: 'Thao tác', visible: true, minWidth: 80, width: 85, order: 12 },
 ];
 
 export default function DonHangPage() {
@@ -85,7 +86,7 @@ export default function DonHangPage() {
     handleUpdateColumn,
     handleReorderColumns,
     handleResetColumns,
-  } = useColumnSettings('don_hang', INITIAL_COLUMNS);
+  } = useColumnSettings('don_hang_v3', INITIAL_COLUMNS);
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -413,6 +414,12 @@ export default function DonHangPage() {
       }
       case 'status':
         return renderStatusBadge(row.status);
+      case 'creator':
+        return (
+          <span className="text-xs text-foreground font-medium">
+            {row.creator || '—'}
+          </span>
+        );
       case 'actions': {
         const debtInfo = virtualDebtMap.get(row.id);
         const enrichedRow: Order = debtInfo ? { ...row, oldDebt: debtInfo.oldDebt, totalPayment: debtInfo.totalPayment } : row;

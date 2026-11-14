@@ -516,13 +516,78 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
         const sheetItems = itemsByOrderCode.get(code);
 
         // Nhận diện linh hoạt cấu trúc sheet DON_HANG:
-        // Cũ (19 cột): r[3]=SĐT, r[4]=Địa chỉ, r[5]=SL hoa, r[6]=Thành tiền
-        // Mới (17 cột): Đã xóa SĐT & Địa chỉ => r[3]=SL hoa, r[4]=Thành tiền
+        // Cũ 1 (19 cột): r[3]=SĐT, r[4]=Địa chỉ, r[5]=SL hoa, r[6]=Thành tiền, ..., r[16]=Người tạo
+        // Mới A (17 cột, SL hoa sau Người tạo): r[3]=Thành tiền, ..., r[13]=Người tạo, r[14]=SL hoa, r[15]=Ghi chú
+        // Mới B (17 cột, SL hoa ở đầu): r[3]=SL hoa, r[4]=Thành tiền, ..., r[14]=Người tạo, r[15]=Ghi chú
         const hasPhoneAddress =
           r.length >= 18 &&
           (isNaN(parseSheetNumber(r[3])) || isNaN(parseSheetNumber(r[4]))) &&
           !isNaN(parseSheetNumber(r[5]));
-        const offset = hasPhoneAddress ? 2 : 0;
+
+        const isQtyAfterCreator =
+          !hasPhoneAddress &&
+          r.length >= 15 &&
+          isNaN(parseSheetNumber(r[13])) &&
+          !isNaN(parseSheetNumber(r[14])) &&
+          parseSheetNumber(r[14]) > 0;
+
+        let totalQuantity = 0;
+        let itemsSubtotal = 0;
+        let shippingFee = 0;
+        let discount = 0;
+        let totalAmount = 0;
+        let oldDebt = 0;
+        let totalPayment = 0;
+        let paidAmount = 0;
+        let debtAmount = 0;
+        let status: Order['status'] = 'nhap';
+        let paymentStatus: Order['paymentStatus'] = 'unpaid';
+        let creator = '';
+        let notes = '';
+
+        if (hasPhoneAddress) {
+          totalQuantity = parseSheetNumber(r[5]) || prev?.totalQuantity || 0;
+          itemsSubtotal = parseSheetNumber(r[6]) || prev?.itemsSubtotal || 0;
+          shippingFee = parseSheetNumber(r[7]) || prev?.shippingFee || 0;
+          discount = parseSheetNumber(r[8]) || prev?.discount || 0;
+          totalAmount = parseSheetNumber(r[9]) || prev?.totalAmount || 0;
+          oldDebt = parseSheetNumber(r[10]) || prev?.oldDebt || 0;
+          totalPayment = parseSheetNumber(r[11]) || prev?.totalPayment || 0;
+          paidAmount = parseSheetNumber(r[12]) || prev?.paidAmount || 0;
+          debtAmount = parseSheetNumber(r[13]) || prev?.debtAmount || 0;
+          status = (String(r[14] || prev?.status || 'nhap').trim()) as Order['status'];
+          paymentStatus = (String(r[15] || prev?.paymentStatus || 'unpaid').trim()) as Order['paymentStatus'];
+          creator = String(r[16] || '').trim() || prev?.creator || '';
+          notes = String(r[17] || '').trim() || prev?.notes || '';
+        } else if (isQtyAfterCreator) {
+          itemsSubtotal = parseSheetNumber(r[3]) || prev?.itemsSubtotal || 0;
+          shippingFee = parseSheetNumber(r[4]) || prev?.shippingFee || 0;
+          discount = parseSheetNumber(r[5]) || prev?.discount || 0;
+          totalAmount = parseSheetNumber(r[6]) || prev?.totalAmount || 0;
+          oldDebt = parseSheetNumber(r[7]) || prev?.oldDebt || 0;
+          totalPayment = parseSheetNumber(r[8]) || prev?.totalPayment || 0;
+          paidAmount = parseSheetNumber(r[9]) || prev?.paidAmount || 0;
+          debtAmount = parseSheetNumber(r[10]) || prev?.debtAmount || 0;
+          status = (String(r[11] || prev?.status || 'nhap').trim()) as Order['status'];
+          paymentStatus = (String(r[12] || prev?.paymentStatus || 'unpaid').trim()) as Order['paymentStatus'];
+          creator = String(r[13] || '').trim() || prev?.creator || '';
+          totalQuantity = parseSheetNumber(r[14]) || prev?.totalQuantity || 0;
+          notes = String(r[15] || '').trim() || prev?.notes || '';
+        } else {
+          totalQuantity = parseSheetNumber(r[3]) || prev?.totalQuantity || 0;
+          itemsSubtotal = parseSheetNumber(r[4]) || prev?.itemsSubtotal || 0;
+          shippingFee = parseSheetNumber(r[5]) || prev?.shippingFee || 0;
+          discount = parseSheetNumber(r[6]) || prev?.discount || 0;
+          totalAmount = parseSheetNumber(r[7]) || prev?.totalAmount || 0;
+          oldDebt = parseSheetNumber(r[8]) || prev?.oldDebt || 0;
+          totalPayment = parseSheetNumber(r[9]) || prev?.totalPayment || 0;
+          paidAmount = parseSheetNumber(r[10]) || prev?.paidAmount || 0;
+          debtAmount = parseSheetNumber(r[11]) || prev?.debtAmount || 0;
+          status = (String(r[12] || prev?.status || 'nhap').trim()) as Order['status'];
+          paymentStatus = (String(r[13] || prev?.paymentStatus || 'unpaid').trim()) as Order['paymentStatus'];
+          creator = String(r[14] || '').trim() || prev?.creator || '';
+          notes = String(r[15] || '').trim() || prev?.notes || '';
+        }
 
         return {
           id: prev?.id || `dh-sync-${idx + 1}`,
@@ -531,19 +596,19 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
           distributorName: String(r[2] || '').trim(),
           phone: hasPhoneAddress ? String(r[3] || '').trim() : (prev?.phone || ''),
           address: hasPhoneAddress ? String(r[4] || '').trim() : (prev?.address || ''),
-          totalQuantity: parseSheetNumber(r[3 + offset]) || prev?.totalQuantity || 0,
-          itemsSubtotal: parseSheetNumber(r[4 + offset]) || prev?.itemsSubtotal || 0,
-          shippingFee: parseSheetNumber(r[5 + offset]) || prev?.shippingFee || 0,
-          discount: parseSheetNumber(r[6 + offset]) || prev?.discount || 0,
-          totalAmount: parseSheetNumber(r[7 + offset]) || prev?.totalAmount || 0,
-          oldDebt: parseSheetNumber(r[8 + offset]) || prev?.oldDebt || 0,
-          totalPayment: parseSheetNumber(r[9 + offset]) || prev?.totalPayment || 0,
-          paidAmount: parseSheetNumber(r[10 + offset]) || prev?.paidAmount || 0,
-          debtAmount: parseSheetNumber(r[11 + offset]) || prev?.debtAmount || 0,
-          status: (String(r[12 + offset] || prev?.status || 'nhap').trim()) as Order['status'],
-          paymentStatus: (String(r[13 + offset] || prev?.paymentStatus || 'unpaid').trim()) as Order['paymentStatus'],
-          creator: String(r[14 + offset] || '').trim() || prev?.creator || '',
-          notes: String(r[15 + offset] || '').trim() || prev?.notes || '',
+          totalQuantity,
+          itemsSubtotal,
+          shippingFee,
+          discount,
+          totalAmount,
+          oldDebt,
+          totalPayment,
+          paidAmount,
+          debtAmount,
+          status,
+          paymentStatus,
+          creator,
+          notes,
           // Ưu tiên chi tiết từ Sheets; chỉ giữ dữ liệu cục bộ khi sheet chưa có dòng chi tiết.
           items: sheetItems?.length ? sheetItems : (prev?.items || []),
           updatedAt: prev?.updatedAt,

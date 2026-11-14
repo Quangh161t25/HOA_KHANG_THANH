@@ -42,7 +42,6 @@ export function buildSheetTables(body: SheetSyncBody): SheetTable[] {
         o.code || '',
         toSheetDate(o.orderDate),
         o.distributorName || '',
-        totalQty,
         subtotal,
         o.shippingFee || 0,
         o.discount || 0,
@@ -54,6 +53,7 @@ export function buildSheetTables(body: SheetSyncBody): SheetTable[] {
         o.status || '',
         o.paymentStatus || '',
         o.creator || '',
+        totalQty,
         o.notes || '',
         toSheetDateTime(),
       ];
