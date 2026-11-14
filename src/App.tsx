@@ -16,6 +16,7 @@ const TonNgayPage = lazy(pageLoaders.tonNgay);
 const NCCPage = lazy(pageLoaders.ncc);
 const NPPPage = lazy(pageLoaders.npp);
 const CongNoPage = lazy(pageLoaders.congNo);
+const CongNoNCCPage = lazy(pageLoaders.congNoNcc);
 const ThuChiPage = lazy(pageLoaders.thuChi);
 const NhanVienPage = lazy(pageLoaders.nhanVien);
 const PhanQuyenPage = lazy(pageLoaders.phanQuyen);
@@ -31,7 +32,7 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return;
-    const paths = ['/don-hang', '/don-hang-ncc', '/cong-no', '/hoa', '/nha-phan-phoi', '/nha-cung-cap', '/ton-kho', '/ton-ngay', '/thu-chi', '/nhan-vien', '/phan-quyen'];
+    const paths = ['/don-hang', '/don-hang-ncc', '/cong-no', '/cong-no-ncc', '/hoa', '/nha-phan-phoi', '/nha-cung-cap', '/ton-kho', '/ton-ngay', '/thu-chi', '/nhan-vien', '/phan-quyen'];
     let cancelled = false;
     let timer = 0;
     let index = 0;
@@ -87,6 +88,8 @@ export default function App() {
             <Route path="/npp" element={<NPPPage />} />
             <Route path="/cong-no" element={<CongNoPage />} />
             <Route path="/quan-ly-cong-no" element={<CongNoPage />} />
+            <Route path="/cong-no-ncc" element={<CongNoNCCPage />} />
+            <Route path="/quan-ly-cong-no-ncc" element={<CongNoNCCPage />} />
             <Route path="/thu-chi" element={<ThuChiPage />} />
             <Route path="/nhan-vien" element={<NhanVienPage />} />
             <Route path="/phan-quyen" element={<PhanQuyenPage />} />

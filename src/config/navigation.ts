@@ -2,6 +2,7 @@ import {
   Boxes,
   ClipboardCheck,
   Flower2,
+  HandCoins,
   LayoutDashboard,
   PackagePlus,
   ReceiptText,
@@ -82,10 +83,17 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     path: '/cong-no',
-    nameKey: 'Công nợ',
-    descriptionKey: 'Sổ theo dõi công nợ NPP & NCC theo ngày',
+    nameKey: 'Công nợ NPP',
+    descriptionKey: 'Sổ theo dõi công nợ NPP & khách hàng theo ngày',
     icon: ReceiptText,
     gradient: 'bg-gradient-to-br from-amber-600 to-orange-700',
+  },
+  {
+    path: '/cong-no-ncc',
+    nameKey: 'Công nợ NCC',
+    descriptionKey: 'Sổ theo dõi công nợ nhà cung cấp & nhà vườn',
+    icon: HandCoins,
+    gradient: 'bg-gradient-to-br from-emerald-600 to-teal-700',
   },
   {
     path: '/thu-chi',

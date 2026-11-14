@@ -35,6 +35,8 @@ interface Props {
   record?: DebtDailyRecord | null;
   mode?: 'create' | 'edit' | 'view';
   defaultPartnerType?: 'npp' | 'ncc';
+  lockPartnerType?: boolean;
+  defaultPartnerId?: string;
 }
 
 const formatNumber = (num?: number) => {
@@ -48,6 +50,8 @@ export function CongNoDrawer({
   record,
   mode: initialMode = 'create',
   defaultPartnerType = 'npp',
+  lockPartnerType = false,
+  defaultPartnerId,
 }: Props) {
   const { addRecord, updateRecord } = useDebtStore();
   const { distributors } = useDistributorStore();
@@ -158,17 +162,22 @@ export function CongNoDrawer({
       setDate(today);
       setReferenceCode('');
       setEntryType('daily');
-      setType('thu');
+      setType(defaultPartnerType === 'ncc' ? 'chi' : 'thu');
       setAmount(0);
       setCreator('Trần Thị Kim Thành');
       setNotes('');
 
       const list = defaultPartnerType === 'npp' ? distributors : suppliers;
-      if (list.length > 0) {
-        setPartnerId(list[0].id);
+      let targetPartner = list.find((p) => p.id === defaultPartnerId);
+      if (!targetPartner && list.length > 0) {
+        targetPartner = list[0];
+      }
+
+      if (targetPartner) {
+        setPartnerId(targetPartner.id);
         const debt =
-          list[0].finalDebt ??
-          (defaultPartnerType === 'npp' ? (list[0] as any).currentDebt : (list[0] as any).totalDebt) ??
+          targetPartner.finalDebt ??
+          (defaultPartnerType === 'npp' ? (targetPartner as any).currentDebt : (targetPartner as any).totalDebt) ??
           0;
         setRemainingDebt(debt);
       } else {
@@ -176,7 +185,7 @@ export function CongNoDrawer({
         setRemainingDebt(0);
       }
     }
-  }, [record, initialMode, defaultPartnerType, isOpen, distributors, suppliers]);
+  }, [record, initialMode, defaultPartnerType, defaultPartnerId, isOpen, distributors, suppliers]);
 
   const handlePartnerChange = (newPartnerId: string) => {
     setPartnerId(newPartnerId);
@@ -346,39 +355,51 @@ export function CongNoDrawer({
     >
       <form id="debt-form" onSubmit={handleSubmit} className="space-y-4">
         {/* Toggle loại đối tác */}
-        <div>
-          <label className="text-xs font-semibold text-foreground mb-1.5 block">
-            Đối tượng công nợ
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              disabled={isView || mode === 'edit'}
-              onClick={() => handlePartnerTypeChange('npp')}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-semibold transition-all ${
-                partnerType === 'npp'
-                  ? 'border-purple-500 bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 ring-1 ring-purple-500/20'
-                  : 'border-border bg-card text-muted-foreground hover:bg-muted'
-              } ${isView || mode === 'edit' ? 'cursor-not-allowed opacity-80' : ''}`}
-            >
-              <Store size={15} />
-              Nhà Phân Phối (NPP)
-            </button>
-            <button
-              type="button"
-              disabled={isView || mode === 'edit'}
-              onClick={() => handlePartnerTypeChange('ncc')}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-semibold transition-all ${
-                partnerType === 'ncc'
-                  ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 ring-1 ring-emerald-500/20'
-                  : 'border-border bg-card text-muted-foreground hover:bg-muted'
-              } ${isView || mode === 'edit' ? 'cursor-not-allowed opacity-80' : ''}`}
-            >
-              <Truck size={15} />
-              Nhà Cung Cấp (NCC)
-            </button>
+        {!lockPartnerType ? (
+          <div>
+            <label className="text-xs font-semibold text-foreground mb-1.5 block">
+              Đối tượng công nợ
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={isView || mode === 'edit'}
+                onClick={() => handlePartnerTypeChange('npp')}
+                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-semibold transition-all ${
+                  partnerType === 'npp'
+                    ? 'border-purple-500 bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 ring-1 ring-purple-500/20'
+                    : 'border-border bg-card text-muted-foreground hover:bg-muted'
+                } ${isView || mode === 'edit' ? 'cursor-not-allowed opacity-80' : ''}`}
+              >
+                <Store size={15} />
+                Nhà Phân Phối (NPP)
+              </button>
+              <button
+                type="button"
+                disabled={isView || mode === 'edit'}
+                onClick={() => handlePartnerTypeChange('ncc')}
+                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-semibold transition-all ${
+                  partnerType === 'ncc'
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 ring-1 ring-emerald-500/20'
+                    : 'border-border bg-card text-muted-foreground hover:bg-muted'
+                } ${isView || mode === 'edit' ? 'cursor-not-allowed opacity-80' : ''}`}
+              >
+                <Truck size={15} />
+                Nhà Cung Cấp (NCC)
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center justify-between p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-800 dark:text-emerald-200 text-xs font-medium">
+            <span className="flex items-center gap-2">
+              <Truck size={15} className="text-emerald-600" />
+              <span>Đối tượng: <strong>Nhà Cung Cấp (NCC / Nhà vườn)</strong></span>
+            </span>
+            <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/60 font-semibold">
+              Cố định NCC
+            </span>
+          </div>
+        )}
 
         {/* Chọn đối tác */}
         <div>

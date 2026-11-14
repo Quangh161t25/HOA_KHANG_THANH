@@ -1,11 +1,13 @@
 import { History } from 'lucide-react';
 import { ModuleHistory } from '@/components/data/ModuleHistory';
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ChartColumn,
   List,
   MapPin,
   Plus,
+  Receipt,
   RotateCcw,
   SquarePen,
   Star,
@@ -50,6 +52,7 @@ const INITIAL_COLUMNS: ColumnDef[] = [
 ];
 
 export default function NCCPage() {
+  const navigate = useNavigate();
   const { suppliers, deleteSupplier } = useSupplierStore();
   const { records: debtRecords } = useDebtStore();
   const { orders: supplierOrders } = useSupplierOrderStore();
@@ -233,9 +236,19 @@ export default function NCCPage() {
             ? row.finalDebt
             : (row.oldDebt || 0) + (row.importAmount || 0) - (row.paidAmount || 0);
         return (
-          <span className={`text-xs font-mono font-extrabold ${finalDebt > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-            {formatNumber(finalDebt)}
-          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/cong-no-ncc?nccId=${row.id}`);
+            }}
+            className="group inline-flex items-center gap-1 hover:underline text-left cursor-pointer"
+            title="Nhấn để xem sổ chi tiết công nợ của NCC này"
+          >
+            <span className={`text-xs font-mono font-extrabold ${finalDebt > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+              {formatNumber(finalDebt)}
+            </span>
+          </button>
         );
       }
       case 'address':
@@ -273,7 +286,15 @@ export default function NCCPage() {
         );
       case 'actions':
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => navigate(`/cong-no-ncc?nccId=${row.id}`)}
+              className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+              title="Xem sổ công nợ NCC này"
+            >
+              <Receipt size={14} />
+            </button>
             <button
               type="button"
               onClick={() => handleEdit(row)}
@@ -348,6 +369,18 @@ export default function NCCPage() {
             </span>
           </div>
         </div>
+        <div className="flex items-center justify-between pt-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/cong-no-ncc?nccId=${row.id}`);
+            }}
+            className="text-[11px] font-semibold text-emerald-600 hover:underline flex items-center gap-1"
+          >
+            <Receipt size={12} /> Xem sổ công nợ NCC
+          </button>
+        </div>
       </div>
     );
   };
@@ -393,6 +426,17 @@ export default function NCCPage() {
             onClearAllFilters={handleClearAllFilters}
             actions={
               <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate('/cong-no-ncc')}
+                  className="h-8 gap-1 text-xs text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                  title="Chuyển sang module Sổ công nợ NCC"
+                >
+                  <Receipt size={13} />
+                  <span className="hidden sm:inline">Sổ công nợ NCC</span>
+                </Button>
                 <Button
                   type="button"
                   size="sm"
