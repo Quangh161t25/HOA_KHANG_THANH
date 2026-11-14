@@ -183,13 +183,14 @@ export function buildSheetTables(body: SheetSyncBody): SheetTable[] {
     });
   }
 
-  // 7. CONG_NO (10 cột: Mã công nợ / ID ở đầu, Ngày ghi nhận, Đối tác, Loại đối tác, Loại giao dịch, Số tiền, Công nợ lũy kế, Mã đơn, Người phụ trách, Ghi chú)
+  // 7a. CONG_NO_NPP (10 cột: Mã công nợ / ID ở đầu, Ngày ghi nhận, NPP / Khách hàng, Loại đối tác, Loại giao dịch, Số tiền, Công nợ lũy kế, Mã đơn, Người phụ trách, Ghi chú)
   if (body.debtRecords) {
-    const rows = body.debtRecords.map((r, idx) => [
-      r.id || `CN-${String(idx + 1).padStart(4, '0')}`,
+    const nppRecords = body.debtRecords.filter((r) => r.partnerType === 'npp');
+    const nppRows = nppRecords.map((r, idx) => [
+      r.id || `CN-NPP-${String(idx + 1).padStart(4, '0')}`,
       toSheetDate(r.date),
       r.partnerName || '',
-      r.partnerType === 'npp' ? 'NPP' : 'NCC',
+      'NPP',
       r.type || r.entryType || '',
       r.amount || 0,
       r.remainingDebt || r.finalDebt || 0,
@@ -198,8 +199,27 @@ export function buildSheetTables(body: SheetSyncBody): SheetTable[] {
       r.notes || '',
     ]);
     batchData.push({
-      range: 'CONG_NO!A2:J' + Math.max(2, rows.length + 1),
-      values: rows.length > 0 ? rows : [['', '', '', '', '', '', '', '', '', '']],
+      range: 'CONG_NO_NPP!A2:J' + Math.max(2, nppRows.length + 1),
+      values: nppRows.length > 0 ? nppRows : [['', '', '', '', '', '', '', '', '', '']],
+    });
+
+    // 7b. CONG_NO_NCC (10 cột: Mã công nợ / ID ở đầu, Ngày ghi nhận, Nhà Cung Cấp, Loại đối tác, Loại giao dịch, Số tiền, Công nợ lũy kế, Lô nhập / Chứng từ, Người phụ trách, Ghi chú)
+    const nccRecords = body.debtRecords.filter((r) => r.partnerType === 'ncc');
+    const nccRows = nccRecords.map((r, idx) => [
+      r.id || `CN-NCC-${String(idx + 1).padStart(4, '0')}`,
+      toSheetDate(r.date),
+      r.partnerName || '',
+      'NCC',
+      r.type || r.entryType || '',
+      r.amount || 0,
+      r.remainingDebt || r.finalDebt || 0,
+      r.referenceCode || '',
+      r.creator || '',
+      r.notes || '',
+    ]);
+    batchData.push({
+      range: 'CONG_NO_NCC!A2:J' + Math.max(2, nccRows.length + 1),
+      values: nccRows.length > 0 ? nccRows : [['', '', '', '', '', '', '', '', '', '']],
     });
   }
 

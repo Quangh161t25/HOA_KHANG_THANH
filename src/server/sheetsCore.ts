@@ -112,6 +112,8 @@ const PULL_RANGES = [
   'TON_KHO!A2:I',
   'CHI_TIET_DON_HANG!A2:L',
   'DON_NHAP_NCC!A2:L',
+  'CONG_NO_NPP!A2:J',
+  'CONG_NO_NCC!A2:J',
   'CONG_NO!A2:J',
 ];
 
@@ -175,7 +177,34 @@ export async function handleSheetsApi(
       const requests: unknown[] = [];
       for (const table of batchData) {
         const title = table.range.split('!')[0];
-        const sheet = meta.sheets?.find((s) => s.properties.title === title)?.properties;
+        let sheet = meta.sheets?.find((s) => s.properties.title === title)?.properties;
+        if (!sheet) {
+          // Tự tạo sheet mới nếu chưa có trên Spreadsheet
+          const addRes = await fetch(`${api}:batchUpdate`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              requests: [
+                {
+                  addSheet: {
+                    properties: {
+                      title,
+                      gridProperties: { rowCount: 100, columnCount: 12, frozenRowCount: 1 },
+                    },
+                  },
+                },
+              ],
+            }),
+          });
+          const addData = (await addRes.json()) as { replies?: Array<{ addSheet?: { properties: any } }> };
+          if (addData.replies?.[0]?.addSheet?.properties) {
+            sheet = addData.replies[0].addSheet.properties;
+            meta.sheets = meta.sheets || [];
+            meta.sheets.push({ properties: sheet as any });
+          } else {
+            throw new Error(`Không tìm thấy và không thể tạo sheet ${title}`);
+          }
+        }
         if (!sheet) throw new Error(`Không tìm thấy sheet ${title}`);
         const requiredRows = table.values.length + 1;
         if (requiredRows > sheet.gridProperties.rowCount) {
@@ -229,7 +258,13 @@ export async function handleSheetsApi(
 
     if (method === 'GET' && path === '/api/google-sheets/pull-all') {
       const token = await getAccessToken(cfg);
-      const rangeParam = PULL_RANGES.map((r) => `ranges=${encodeURIComponent(r)}`).join('&');
+      const metaRes = await fetch(`${api}?fields=sheets.properties.title`, { headers: { Authorization: `Bearer ${token}` } });
+      const meta = (await metaRes.json()) as {
+        sheets?: Array<{ properties: { title: string } }>;
+      };
+      const existingTitles = new Set((meta.sheets || []).map((s) => s.properties.title));
+      const validRanges = PULL_RANGES.filter((r) => existingTitles.has(r.split('!')[0]));
+      const rangeParam = validRanges.map((r) => `ranges=${encodeURIComponent(r)}`).join('&');
       const resData = await fetch(`${api}/values:batchGet?${rangeParam}`, { headers: { Authorization: `Bearer ${token}` } });
       const result = (await resData.json()) as { valueRanges?: Array<{ range: string; values?: unknown[][] }> };
       if (!resData.ok) return { status: 500, body: { success: false, error: result } };

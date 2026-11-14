@@ -405,23 +405,25 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
       counts['thu_chi'] = transactions.length;
     }
 
-    // --- 7. CONG_NO ---
-    // Layout 10 cột mới: [id, date, partnerName, partnerType(NPP/NCC), type, amount, remainingDebt, referenceCode, creator, notes]
-    // Layout 9 cột cũ (tương thích ngược): [date, partnerName, partnerType(NPP/NCC), type, amount, remainingDebt, referenceCode, creator, notes]
-    const congNoRows = sheetMap['CONG_NO'] || [];
-    if (congNoRows.length > 0) {
-      const allDistributors = useDistributorStore.getState().distributors;
-      const allSuppliers = useSupplierStore.getState().suppliers;
+    // --- 7. CONG_NO_NPP & CONG_NO_NCC (Tách riêng 2 sheet độc lập) ---
+    // Layout 10 cột: [id, date, partnerName, partnerType(NPP/NCC), type, amount, remainingDebt, referenceCode, creator, notes]
+    const congNoNppRows = sheetMap['CONG_NO_NPP'] || [];
+    const congNoNccRows = sheetMap['CONG_NO_NCC'] || [];
+    const legacyCongNoRows = sheetMap['CONG_NO'] || [];
 
-      const records: DebtDailyRecord[] = congNoRows
+    const allDistributors = useDistributorStore.getState().distributors;
+    const allSuppliers = useSupplierStore.getState().suppliers;
+
+    const parseDebtRows = (rows: any[][], forcePartnerType?: 'npp' | 'ncc') => {
+      return rows
         .filter((r) => {
           if (!r[0] || !r[1]) return false;
           const col0 = String(r[0]).trim().toLowerCase();
           const col1 = String(r[1]).trim().toLowerCase();
-          // Bỏ dòng tiêu đề nếu lẫn vào dữ liệu
           if (
             col0 === 'id' ||
             col0 === 'mã công nợ' ||
+            col0 === 'mã công nợ (id)' ||
             col0 === 'mã cn' ||
             col0.includes('công nợ') ||
             col0 === 'ngày' ||
@@ -434,20 +436,21 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
           return true;
         })
         .map((r, idx) => {
-          // Nhận diện xem hàng có cột ID ở đầu (10 cột) hay không:
-          // Nếu r[3] là NPP/NCC hoặc r.length >= 10 -> Layout mới có ID ở cột 0
           const hasIdCol =
             String(r[3] || '').trim().toUpperCase() === 'NPP' ||
             String(r[3] || '').trim().toUpperCase() === 'NCC' ||
             r.length >= 10;
 
+          const defaultPrefix = forcePartnerType === 'ncc' ? 'CN-NCC' : 'CN-NPP';
           const recordId = hasIdCol
-            ? String(r[0] || '').trim() || `CN-${String(idx + 1).padStart(4, '0')}`
+            ? String(r[0] || '').trim() || `${defaultPrefix}-${String(idx + 1).padStart(4, '0')}`
             : `cn-sync-${idx + 1}`;
           const dateStr = hasIdCol ? r[1] : r[0];
           const partnerName = String((hasIdCol ? r[2] : r[1]) || '').trim();
           const partnerTypeRaw = hasIdCol ? r[3] : r[2];
-          const isNpp = String(partnerTypeRaw || '').trim().toUpperCase() === 'NPP';
+          const isNpp = forcePartnerType
+            ? forcePartnerType === 'npp'
+            : String(partnerTypeRaw || '').trim().toUpperCase() === 'NPP';
           const partnerType = (isNpp ? 'npp' : 'ncc') as DebtDailyRecord['partnerType'];
           const matchedDist = isNpp
             ? allDistributors.find((d) => d.name?.trim().toLowerCase() === partnerName.toLowerCase() || d.code === partnerName)
@@ -481,13 +484,27 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
             increaseAmount: isThu ? 0 : amount,
             decreaseAmount: isThu ? amount : 0,
             referenceCode: rawRef,
-            entryType: isOrderRef ? 'order' : 'daily',
+            entryType: (isOrderRef ? 'order' : 'daily') as DebtDailyRecord['entryType'],
             creator,
             notes,
           };
         });
-      useDebtStore.setState({ records });
-      counts['cong_no'] = records.length;
+    };
+
+    let allDebtRecords: DebtDailyRecord[] = [];
+    if (congNoNppRows.length > 0 || congNoNccRows.length > 0) {
+      const nppList = parseDebtRows(congNoNppRows, 'npp');
+      const nccList = parseDebtRows(congNoNccRows, 'ncc');
+      allDebtRecords = [...nppList, ...nccList];
+      if (nppList.length > 0) counts['cong_no_npp'] = nppList.length;
+      if (nccList.length > 0) counts['cong_no_ncc'] = nccList.length;
+    } else if (legacyCongNoRows.length > 0) {
+      allDebtRecords = parseDebtRows(legacyCongNoRows);
+      counts['cong_no'] = allDebtRecords.length;
+    }
+
+    if (allDebtRecords.length > 0) {
+      useDebtStore.setState({ records: allDebtRecords });
     }
 
     // --- 8. DON_HANG + CHI_TIET_DON_HANG ---
@@ -778,6 +795,8 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
       counts['nhan_vien'] ? `${counts['nhan_vien']} nhân viên` : '',
       counts['ton_kho'] ? `${counts['ton_kho']} mặt hàng tồn kho` : '',
       counts['thu_chi'] ? `${counts['thu_chi']} thu chi` : '',
+      counts['cong_no_npp'] ? `${counts['cong_no_npp']} công nợ NPP` : '',
+      counts['cong_no_ncc'] ? `${counts['cong_no_ncc']} công nợ NCC` : '',
       counts['cong_no'] ? `${counts['cong_no']} công nợ` : '',
       counts['don_hang'] ? `${counts['don_hang']} đơn hàng` : '',
       counts['don_nhap_ncc'] ? `${counts['don_nhap_ncc']} đơn nhập NCC` : '',
