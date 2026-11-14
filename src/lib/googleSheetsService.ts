@@ -478,32 +478,70 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
 
       for (const row of detailRows) {
         const orderCode = String(row[0] || '').trim();
-        const flowerCode = String(row[3] || '').trim();
-        const flowerName = String(row[4] || '').trim();
-        if (!orderCode || (!flowerCode && !flowerName)) continue;
+        if (!orderCode) continue;
 
+        // Nhận diện linh hoạt cấu trúc sheet CHI_TIET_DON_HANG:
+        // Cũ (12 cột): r[3]=Mã hoa, r[4]=Tên hoa, r[5]=SL, r[6]=ĐVT, r[7]=Giá vốn, r[8]=Giá bán, r[9]=TT vốn, r[10]=TT bán, r[11]=Lợi nhuận
+        // Mới (12 cột): r[3]=Mã hoa, r[4]=Giá bán, r[5]=SL, r[6]=TT bán, r[7]=Giá vốn, r[8]=TT vốn, r[9]=Lợi nhuận, r[10]=Tên hoa, r[11]=ĐVT
+        const isNewDetailLayout =
+          (!isNaN(parseSheetNumber(row[4])) && parseSheetNumber(row[4]) > 0 && !isNaN(parseSheetNumber(row[6]))) ||
+          (typeof row[10] === 'string' && row[10].trim().length > 0 && isNaN(parseSheetNumber(row[10])));
+
+        let flowerCode = '';
+        let flowerName = '';
+        let quantity = 0;
+        let unit = '';
+        let costPrice = 0;
+        let unitPrice = 0;
+        let importTotal = 0;
+        let amount = 0;
+        let profit = 0;
+
+        if (isNewDetailLayout) {
+          flowerCode = String(row[3] || '').trim();
+          unitPrice = parseSheetNumber(row[4]);
+          quantity = parseSheetNumber(row[5]);
+          amount = parseSheetNumber(row[6]) || (quantity * unitPrice);
+          costPrice = parseSheetNumber(row[7]);
+          importTotal = parseSheetNumber(row[8]) || (quantity * costPrice);
+          profit = parseSheetNumber(row[9]) || (amount - importTotal);
+          flowerName = String(row[10] || '').trim();
+          unit = String(row[11] || '').trim();
+        } else {
+          flowerCode = String(row[3] || '').trim();
+          flowerName = String(row[4] || '').trim();
+          quantity = parseSheetNumber(row[5]);
+          unit = String(row[6] || '').trim();
+          costPrice = parseSheetNumber(row[7]);
+          unitPrice = parseSheetNumber(row[8]);
+          importTotal = parseSheetNumber(row[9]) || (quantity * costPrice);
+          amount = parseSheetNumber(row[10]) || (quantity * unitPrice);
+          profit = parseSheetNumber(row[11]) || (amount - importTotal);
+        }
+
+        const matchedFlower =
+          flowerByCode.get(flowerCode.toLowerCase()) || (flowerName ? flowerByName.get(flowerName.toLowerCase()) : null);
         const previousItem = existingOrderMap.get(orderCode)?.items.find((item) =>
           (flowerCode && item.flowerCode.trim().toLowerCase() === flowerCode.toLowerCase()) ||
           (flowerName && item.flowerName.trim().toLowerCase() === flowerName.toLowerCase()),
         );
-        const matchedFlower =
-          flowerByCode.get(flowerCode.toLowerCase()) || flowerByName.get(flowerName.toLowerCase());
-        const quantity = parseSheetNumber(row[5]);
-        const costPrice = parseSheetNumber(row[7]);
-        const unitPrice = parseSheetNumber(row[8]);
-        const importTotal = parseSheetNumber(row[9]) || quantity * costPrice;
-        const amount = parseSheetNumber(row[10]) || quantity * unitPrice;
+
+        const finalFlowerName = flowerName || matchedFlower?.name || previousItem?.flowerName || flowerCode;
+        if (!flowerCode && !finalFlowerName) continue;
+
+        const finalUnit = unit || matchedFlower?.unit || previousItem?.unit || 'Cành';
+
         const item: OrderItem = {
-          flowerId: matchedFlower?.id || previousItem?.flowerId || `hoa-sheet-${flowerCode || flowerName}`,
-          flowerCode,
-          flowerName,
+          flowerId: matchedFlower?.id || previousItem?.flowerId || `hoa-sheet-${flowerCode || finalFlowerName}`,
+          flowerCode: flowerCode || matchedFlower?.code || '',
+          flowerName: finalFlowerName,
           quantity,
-          unit: String(row[6] || matchedFlower?.unit || previousItem?.unit || 'Cành').trim(),
+          unit: finalUnit,
           costPrice,
           unitPrice,
           importTotal,
           amount,
-          profit: parseSheetNumber(row[11]) || amount - importTotal,
+          profit,
         };
         const currentItems = itemsByOrderCode.get(orderCode) || [];
         currentItems.push(item);

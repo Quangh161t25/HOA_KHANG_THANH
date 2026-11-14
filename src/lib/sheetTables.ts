@@ -65,23 +65,30 @@ export function buildSheetTables(body: SheetSyncBody): SheetTable[] {
       values: rows.length > 0 ? rows : [['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']],
     });
 
-    // 2. CHI_TIET_DON_HANG
+    // 2. CHI_TIET_DON_HANG (Thứ tự mới: Mã ĐH, Ngày, Khách hàng, Mã hoa, Giá bán, SL, TT bán, Giá vốn, TT vốn, Lợi nhuận, Tên hoa, ĐVT)
     const detailRows: any[][] = [];
     body.orders.forEach((o) => {
       (o.items || []).forEach((item: any) => {
+        const qty = item.quantity || 0;
+        const cost = item.costPrice || 0;
+        const price = item.unitPrice || 0;
+        const importTot = item.importTotal ?? (qty * cost);
+        const amt = item.amount ?? (qty * price);
+        const prof = item.profit ?? (amt - importTot);
+
         detailRows.push([
           o.code || '',
           toSheetDate(o.orderDate),
           o.distributorName || '',
           item.flowerCode || '',
+          price,
+          qty,
+          amt,
+          cost,
+          importTot,
+          prof,
           item.flowerName || '',
-          item.quantity || 0,
           item.unit || 'cành',
-          item.costPrice || 0,
-          item.unitPrice || 0,
-          item.importTotal || (item.quantity * (item.costPrice || 0)),
-          item.amount || (item.quantity * (item.unitPrice || 0)),
-          item.profit || ((item.amount || 0) - (item.importTotal || 0)),
         ]);
       });
     });
