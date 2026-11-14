@@ -27,6 +27,7 @@ import {
 import type { DebtDailyRecord } from '@/types/hoaKhangThanh';
 import { formatDate } from '@/lib/format';
 import { PartnerAutocomplete } from '@/components/ui/PartnerAutocomplete';
+import { getRecordReferenceCode } from '@/lib/virtualDebt';
 
 interface Props {
   isOpen: boolean;
@@ -526,7 +527,7 @@ export function CongNoDrawer({
             </label>
             {isView ? (
               <div className="p-2.5 bg-muted/40 rounded-lg border border-border text-xs font-mono text-foreground">
-                {referenceCode || 'Chưa có mã'}
+                {getRecordReferenceCode(record) || referenceCode || 'Chưa có mã'}
               </div>
             ) : (
               <input
@@ -690,7 +691,7 @@ export function CongNoDrawer({
                     return (
                       <tr key={item.id || idx} className="hover:bg-muted/30">
                         <td className="py-2 px-2.5 font-mono font-bold text-foreground">
-                          {item.referenceCode || 'Phát sinh'}
+                          {getRecordReferenceCode(item) || item.referenceCode || 'Phát sinh'}
                         </td>
                         <td className="py-2 px-2.5">
                           <span

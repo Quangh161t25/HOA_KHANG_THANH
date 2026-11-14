@@ -35,7 +35,7 @@ import {
 import type { DebtDailyRecord } from '@/types/hoaKhangThanh';
 import { formatDate, todayISODate } from '@/lib/format';
 import { CongNoDrawer } from './CongNoDrawer';
-import { useAllDebtRecords } from '@/lib/virtualDebt';
+import { getRecordReferenceCode, useAllDebtRecords } from '@/lib/virtualDebt';
 import { CongNoStats } from './CongNoStats';
 
 type Tab = 'npp' | 'ncc' | 'tonghop' | 'thongke' | 'lichsu';
@@ -213,7 +213,8 @@ export default function CongNoPage() {
         const q = searchTerm.toLowerCase();
         const matchCode = r.partnerCode.toLowerCase().includes(q);
         const matchName = r.partnerName.toLowerCase().includes(q);
-        const matchRef = (r.referenceCode || '').toLowerCase().includes(q);
+        const refDisplay = getRecordReferenceCode(r).toLowerCase();
+        const matchRef = (r.referenceCode || '').toLowerCase().includes(q) || refDisplay.includes(q);
         const matchNotes = (r.notes || '').toLowerCase().includes(q);
         const matchCreator = (r.creator || '').toLowerCase().includes(q);
         if (!matchCode && !matchName && !matchRef && !matchNotes && !matchCreator) {
@@ -274,7 +275,7 @@ export default function CongNoPage() {
         } else if (refCodes.length > 1) {
           refSummary = `${refCodes.length} ${groupType === 'chi' ? 'đơn' : 'phiếu'} (${refCodes.slice(0, 2).join(', ')}${refCodes.length > 2 ? '...' : ''})`;
         } else {
-          refSummary = groupType === 'thu' ? 'Thu nợ đối tác' : 'Bán hoa trong ngày';
+          refSummary = groupType === 'thu' ? 'Thu nợ đối tác' : (first.partnerType === 'ncc' ? 'Nhập hoa NCC' : 'Bán hoa trong ngày');
         }
 
         aggregatedList.push({
@@ -571,7 +572,7 @@ export default function CongNoPage() {
         'Mã đối tác': r.partnerCode,
         'Tên đối tác': r.partnerName,
         'Số điện thoại': r.phone || '',
-        'Chứng từ / Đơn hàng': r.referenceCode || '',
+        'Chứng từ / Đơn hàng': getRecordReferenceCode(r),
         'Thu / Chi': isThu ? 'Thu' : 'Chi',
         'Số tiền': amt || 0,
         'Công nợ còn': remDebt || 0,
@@ -654,14 +655,16 @@ export default function CongNoPage() {
           </div>
         );
       }
-      case 'referenceCode':
-        return row.referenceCode ? (
+      case 'referenceCode': {
+        const refDisplay = getRecordReferenceCode(row);
+        return refDisplay ? (
           <span className="inline-flex items-center gap-1 text-xs font-mono font-semibold px-2 py-0.5 rounded bg-muted/60 border border-border text-foreground">
-            {row.referenceCode}
+            {refDisplay}
           </span>
         ) : (
           <span className="text-xs font-mono text-muted-foreground">—</span>
         );
+      }
       case 'type':
         return isThu ? (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-extrabold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
@@ -813,9 +816,9 @@ export default function CongNoPage() {
 
         <div>
           <h4 className="text-xs font-bold text-foreground truncate">{row.partnerName}</h4>
-          {row.referenceCode && (
-            <p className="text-[11px] font-mono text-muted-foreground">Chứng từ / ĐH: {row.referenceCode}</p>
-          )}
+          {getRecordReferenceCode(row) ? (
+            <p className="text-[11px] font-mono text-muted-foreground">Chứng từ / ĐH: {getRecordReferenceCode(row)}</p>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/50 text-[11px]">

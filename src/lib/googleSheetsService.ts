@@ -422,6 +422,8 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
         const type = (r[3] === 'thu' || r[3] === 'Thu' ? 'thu' : 'chi') as DebtDailyRecord['type'];
         const amount = parseSheetNumber(r[4]) || 0;
         const isThu = type === 'thu';
+        const rawRef = String(r[6] || '').trim();
+        const isOrderRef = rawRef.startsWith('DH-') || rawRef.startsWith('PO-');
 
         return {
           id: `cn-sync-${idx + 1}`,
@@ -436,7 +438,8 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
           finalDebt: parseSheetNumber(r[5]) || 0,
           increaseAmount: isThu ? 0 : amount,
           decreaseAmount: isThu ? amount : 0,
-          referenceCode: String(r[6] || '').trim(),
+          referenceCode: rawRef,
+          entryType: isOrderRef ? 'order' : 'daily',
           creator: String(r[7] || '').trim(),
           notes: String(r[8] || '').trim(),
         };

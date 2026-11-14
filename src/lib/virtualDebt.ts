@@ -153,3 +153,23 @@ export function useAllDebtRecords(): DebtDailyRecord[] {
     [manual, orders, supplierOrders, distributors, suppliers],
   );
 }
+
+/**
+ * Lấy mã chứng từ / mã hiển thị thân thiện cho dòng công nợ:
+ * - Nếu có referenceCode (DH-..., PO-..., PT-..., PC-...): hiển thị mã đó
+ * - Nếu không có:
+ *   + Thu: "Thu nợ đối tác"
+ *   + Chi NPP: "Bán hoa trong ngày"
+ *   + Chi NCC: "Nhập hoa NCC"
+ */
+export function getRecordReferenceCode(r?: DebtDailyRecord | null): string {
+  if (!r) return '';
+  if (r.referenceCode && r.referenceCode.trim()) return r.referenceCode.trim();
+  const isOrder =
+    r.entryType === 'order' ||
+    Boolean(r.referenceCode && (r.referenceCode.startsWith('DH-') || r.referenceCode.startsWith('PO-')));
+  if (isOrder) return '';
+  const isThu = r.type === 'thu' || ((r.decreaseAmount || 0) > 0 && (r.increaseAmount || 0) === 0);
+  if (isThu) return 'Thu nợ đối tác';
+  return r.partnerType === 'ncc' ? 'Nhập hoa NCC' : 'Bán hoa trong ngày';
+}
