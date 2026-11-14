@@ -355,7 +355,6 @@ export default function DonHangPage() {
                 </span>
               )}
             </div>
-            {row.phone && <span className="text-[11px] text-muted-foreground font-mono block">{row.phone}</span>}
           </div>
         );
       }

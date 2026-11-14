@@ -42,8 +42,6 @@ export function buildSheetTables(body: SheetSyncBody): SheetTable[] {
         o.code || '',
         toSheetDate(o.orderDate),
         o.distributorName || '',
-        o.phone || '',
-        o.address || '',
         totalQty,
         subtotal,
         o.shippingFee || 0,
@@ -61,10 +59,10 @@ export function buildSheetTables(body: SheetSyncBody): SheetTable[] {
       ];
     });
 
-    // Clear old data from row 2 to 1000, then write new
+    // Clear old data from row 2, then write new (17 columns A to Q, bỏ SĐT và Địa chỉ)
     batchData.push({
-      range: 'DON_HANG!A2:S' + Math.max(2, rows.length + 1),
-      values: rows.length > 0 ? rows : [['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']],
+      range: 'DON_HANG!A2:Q' + Math.max(2, rows.length + 1),
+      values: rows.length > 0 ? rows : [['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']],
     });
 
     // 2. CHI_TIET_DON_HANG

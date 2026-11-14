@@ -514,26 +514,36 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
         const code = String(r[0] || '').trim();
         const prev = existingOrderMap.get(code);
         const sheetItems = itemsByOrderCode.get(code);
+
+        // Nhận diện linh hoạt cấu trúc sheet DON_HANG:
+        // Cũ (19 cột): r[3]=SĐT, r[4]=Địa chỉ, r[5]=SL hoa, r[6]=Thành tiền
+        // Mới (17 cột): Đã xóa SĐT & Địa chỉ => r[3]=SL hoa, r[4]=Thành tiền
+        const hasPhoneAddress =
+          r.length >= 18 &&
+          (isNaN(parseSheetNumber(r[3])) || isNaN(parseSheetNumber(r[4]))) &&
+          !isNaN(parseSheetNumber(r[5]));
+        const offset = hasPhoneAddress ? 2 : 0;
+
         return {
           id: prev?.id || `dh-sync-${idx + 1}`,
           code,
           orderDate: fromSheetDate(r[1]),
           distributorName: String(r[2] || '').trim(),
-          phone: String(r[3] || '').trim() || prev?.phone || '',
-                    address: String(r[4] || '').trim() || prev?.address || '',
-          totalQuantity: parseSheetNumber(r[5]) || prev?.totalQuantity || 0,
-          itemsSubtotal: parseSheetNumber(r[6]) || prev?.itemsSubtotal || 0,
-          shippingFee: parseSheetNumber(r[7]) || prev?.shippingFee || 0,
-          discount: parseSheetNumber(r[8]) || prev?.discount || 0,
-          totalAmount: parseSheetNumber(r[9]) || prev?.totalAmount || 0,
-          oldDebt: parseSheetNumber(r[10]) || prev?.oldDebt || 0,
-          totalPayment: parseSheetNumber(r[11]) || prev?.totalPayment || 0,
-          paidAmount: parseSheetNumber(r[12]) || prev?.paidAmount || 0,
-          debtAmount: parseSheetNumber(r[13]) || prev?.debtAmount || 0,
-          status: (String(r[14] || prev?.status || 'nhap').trim()) as Order['status'],
-          paymentStatus: (String(r[15] || prev?.paymentStatus || 'unpaid').trim()) as Order['paymentStatus'],
-          creator: String(r[16] || '').trim() || prev?.creator || '',
-          notes: String(r[17] || '').trim() || prev?.notes || '',
+          phone: hasPhoneAddress ? String(r[3] || '').trim() : (prev?.phone || ''),
+          address: hasPhoneAddress ? String(r[4] || '').trim() : (prev?.address || ''),
+          totalQuantity: parseSheetNumber(r[3 + offset]) || prev?.totalQuantity || 0,
+          itemsSubtotal: parseSheetNumber(r[4 + offset]) || prev?.itemsSubtotal || 0,
+          shippingFee: parseSheetNumber(r[5 + offset]) || prev?.shippingFee || 0,
+          discount: parseSheetNumber(r[6 + offset]) || prev?.discount || 0,
+          totalAmount: parseSheetNumber(r[7 + offset]) || prev?.totalAmount || 0,
+          oldDebt: parseSheetNumber(r[8 + offset]) || prev?.oldDebt || 0,
+          totalPayment: parseSheetNumber(r[9 + offset]) || prev?.totalPayment || 0,
+          paidAmount: parseSheetNumber(r[10 + offset]) || prev?.paidAmount || 0,
+          debtAmount: parseSheetNumber(r[11 + offset]) || prev?.debtAmount || 0,
+          status: (String(r[12 + offset] || prev?.status || 'nhap').trim()) as Order['status'],
+          paymentStatus: (String(r[13 + offset] || prev?.paymentStatus || 'unpaid').trim()) as Order['paymentStatus'],
+          creator: String(r[14 + offset] || '').trim() || prev?.creator || '',
+          notes: String(r[15 + offset] || '').trim() || prev?.notes || '',
           // Ưu tiên chi tiết từ Sheets; chỉ giữ dữ liệu cục bộ khi sheet chưa có dòng chi tiết.
           items: sheetItems?.length ? sheetItems : (prev?.items || []),
           updatedAt: prev?.updatedAt,

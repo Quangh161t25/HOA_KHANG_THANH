@@ -1037,33 +1037,18 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
               </div>
             </div>
 
-            {/* Dòng 2: NPP / Khách hàng & SĐT */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2.5 border-t border-border/50">
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                  NPP / Khách hàng (Gõ để tìm kiếm)
-                </label>
-                <PartnerAutocomplete
-                  value={partnerName}
-                  selectedId={distributorId}
-                  options={distributorOptions}
-                  onChange={handlePartnerSelect}
-                  placeholder="Gõ tên hoặc mã NPP / Khách hàng..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                  Số điện thoại liên hệ
-                </label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="0903 112 233"
-                  className="w-full h-8 px-2.5 rounded-lg border border-border bg-background text-xs font-mono text-foreground focus:ring-1 focus:ring-primary"
-                />
-              </div>
+            {/* Dòng 2: NPP / Khách hàng */}
+            <div className="pt-2.5 border-t border-border/50">
+              <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                NPP / Khách hàng (Gõ để tìm kiếm)
+              </label>
+              <PartnerAutocomplete
+                value={partnerName}
+                selectedId={distributorId}
+                options={distributorOptions}
+                onChange={handlePartnerSelect}
+                placeholder="Gõ tên hoặc mã NPP / Khách hàng..."
+              />
             </div>
 
             {/* KHỐI CẢNH BÁO CÔNG NỢ NẾU KHÁCH 4 NGÀY CHƯA THANH TOÁN XONG ĐƠN CŨ */}

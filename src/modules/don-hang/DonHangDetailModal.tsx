@@ -6,7 +6,6 @@ import {
   Coins,
   ExternalLink,
   Package,
-  Phone,
   Printer,
   ShoppingCart,
   Truck,
@@ -214,16 +213,6 @@ export function DonHangDetailModal({ order, onClose, onEdit }: Props) {
                 NPP / Khách hàng
               </span>
               <div className="text-sm font-bold text-foreground">{order.distributorName}</div>
-              {order.phone && (
-                <div className="text-muted-foreground flex items-center gap-1.5 mt-1 font-mono">
-                  <Phone size={13} className="text-primary" /> {order.phone}
-                </div>
-              )}
-              {order.address && (
-                <div className="text-muted-foreground mt-1">
-                  Địa chỉ: {order.address}
-                </div>
-              )}
             </div>
 
             <div>
