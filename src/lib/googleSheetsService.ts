@@ -90,6 +90,13 @@ export function parseSheetNumber(val: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
+export function isNumericString(val: unknown): boolean {
+  if (val === undefined || val === null || val === '') return false;
+  if (typeof val === 'number') return !isNaN(val);
+  const s = String(val).trim().replace(/\s+/g, '').replace(/[₫đVNDvnd$.,]/g, '');
+  return s.length > 0 && !isNaN(Number(s));
+}
+
 /**
  * Kiểm tra trạng thái kết nối tới Google Spreadsheet
  */
@@ -515,12 +522,25 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
         const orderCode = String(row[0] || '').trim();
         if (!orderCode) continue;
 
+        // Bỏ qua dòng tiêu đề nếu lẫn vào dữ liệu
+        const col0 = orderCode.toLowerCase();
+        if (
+          col0 === 'id_don_hang' ||
+          col0 === 'mã đơn hàng' ||
+          col0 === 'ma_don' ||
+          String(row[1] || '').trim().toLowerCase() === 'ngay' ||
+          String(row[1] || '').trim().toLowerCase() === 'ngày đặt'
+        ) {
+          continue;
+        }
+
         // Nhận diện linh hoạt cấu trúc sheet CHI_TIET_DON_HANG:
         // Cũ (12 cột): r[3]=Mã hoa, r[4]=Tên hoa, r[5]=SL, r[6]=ĐVT, r[7]=Giá vốn, r[8]=Giá bán, r[9]=TT vốn, r[10]=TT bán, r[11]=Lợi nhuận
-        // Mới (12 cột): r[3]=Mã hoa, r[4]=Giá bán, r[5]=SL, r[6]=TT bán, r[7]=Giá vốn, r[8]=TT vốn, r[9]=Lợi nhuận, r[10]=Tên hoa, r[11]=ĐVT
-        const isNewDetailLayout =
-          (!isNaN(parseSheetNumber(row[4])) && parseSheetNumber(row[4]) > 0 && !isNaN(parseSheetNumber(row[6]))) ||
-          (typeof row[10] === 'string' && row[10].trim().length > 0 && isNaN(parseSheetNumber(row[10])));
+        // Mới (12 cột theo yêu cầu người dùng):
+        //   r[3]=Mã hoa, r[4]=Giá bán, r[5]=SL, r[6]=TT bán, r[7]=Giá vốn, r[8]=TT vốn, r[9]=Lợi nhuận, r[10]=Tên hoa, r[11]=ĐVT
+        // Layout 10 cột cũ (id_don_hang, ngay, khach_hang, id_hoa, gia_ban, slg, tien_ban, gia_nhap, tien_nhap, loi_nhuan):
+        //   r[3]=id_hoa, r[4]=Giá bán, r[5]=SL, r[6]=TT bán, r[7]=Giá vốn, r[8]=TT vốn, r[9]=Lợi nhuận
+        const isNewDetailLayout = isNumericString(row[4]) && isNumericString(row[6]);
 
         let flowerCode = '';
         let flowerName = '';
@@ -555,10 +575,13 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
         }
 
         const matchedFlower =
-          flowerByCode.get(flowerCode.toLowerCase()) || (flowerName ? flowerByName.get(flowerName.toLowerCase()) : null);
+          flowerByCode.get(flowerCode.toLowerCase()) ||
+          (flowerName ? flowerByName.get(flowerName.toLowerCase()) : null) ||
+          flowerByName.get(flowerCode.toLowerCase());
         const previousItem = existingOrderMap.get(orderCode)?.items.find((item) =>
           (flowerCode && item.flowerCode.trim().toLowerCase() === flowerCode.toLowerCase()) ||
-          (flowerName && item.flowerName.trim().toLowerCase() === flowerName.toLowerCase()),
+          (flowerName && item.flowerName.trim().toLowerCase() === flowerName.toLowerCase()) ||
+          (flowerCode && item.flowerName.trim().toLowerCase() === flowerCode.toLowerCase()),
         );
 
         const finalFlowerName = flowerName || matchedFlower?.name || previousItem?.flowerName || flowerCode;
@@ -583,26 +606,43 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
         itemsByOrderCode.set(orderCode, currentItems);
       }
 
-      const orders = normalizeOrders(uniqueOrderRows.filter((r) => r[0] && r[1]).map((r, idx): Order => {
+      const orders = normalizeOrders(uniqueOrderRows.filter((r) => {
+        if (!r[0] || !r[1]) return false;
+        const col0 = String(r[0]).trim().toLowerCase();
+        const col1 = String(r[1]).trim().toLowerCase();
+        if (col0 === 'id' || col0 === 'mã đơn hàng' || col0 === 'ma_don' || col1 === 'ngay' || col1 === 'ngày đặt') {
+          return false;
+        }
+        return true;
+      }).map((r, idx): Order => {
         const code = String(r[0] || '').trim();
         const prev = existingOrderMap.get(code);
         const sheetItems = itemsByOrderCode.get(code);
 
-        // Nhận diện linh hoạt cấu trúc sheet DON_HANG:
-        // Cũ 1 (19 cột): r[3]=SĐT, r[4]=Địa chỉ, r[5]=SL hoa, r[6]=Thành tiền, ..., r[16]=Người tạo
-        // Mới A (17 cột, SL hoa sau Người tạo): r[3]=Thành tiền, ..., r[13]=Người tạo, r[14]=SL hoa, r[15]=Ghi chú
-        // Mới B (17 cột, SL hoa ở đầu): r[3]=SL hoa, r[4]=Thành tiền, ..., r[14]=Người tạo, r[15]=Ghi chú
-        const hasPhoneAddress =
-          r.length >= 18 &&
-          (isNaN(parseSheetNumber(r[3])) || isNaN(parseSheetNumber(r[4]))) &&
-          !isNaN(parseSheetNumber(r[5]));
+        // Nhận diện chính xác các cấu trúc sheet DON_HANG:
+        // Layout 1: Chuẩn 17 cột (Đã bỏ SĐT/Địa chỉ, cột Số lượng hoa r[14] sau Người tạo đơn r[13])
+        //   r[0]=Mã ĐH, r[1]=Ngày, r[2]=NPP/Khách, r[3]=Thành tiền hoa, r[4]=Cước, r[5]=Trừ hàng, r[6]=Tổng tiền,
+        //   r[7]=Nợ cũ, r[8]=Thanh toán, r[9]=Đã thanh toán, r[10]=Còn nợ, r[11]=Trạng thái, r[12]=Trạng thái thanh toán,
+        //   r[13]=Người tạo, r[14]=SL hoa, r[15]=Ghi chú, r[16]=Cập nhật lúc
+        //
+        // Layout 2: Dòng 7 cột (các đơn cũ trên Google Sheets)
+        //   r[0]=id, r[1]=ngay, r[2]=khach_hang, r[3]=thanh_tien, r[4]=cuoc_xe, r[5]=tru_hang, r[6]=tong_tien
+        //
+        // Layout 3: Bản cũ 19 cột (có SĐT r[3] & Địa chỉ r[4])
+        //   r[0]=Mã, r[1]=Ngày, r[2]=Khách, r[3]=SĐT, r[4]=Địa chỉ, r[5]=SL hoa, r[6]=Thành tiền, r[7]=Cước, r[8]=Trừ hàng...
 
-        const isQtyAfterCreator =
-          !hasPhoneAddress &&
-          r.length >= 15 &&
-          isNaN(parseSheetNumber(r[13])) &&
-          !isNaN(parseSheetNumber(r[14])) &&
-          parseSheetNumber(r[14]) > 0;
+        const isStandard17Cols =
+          r.length >= 14 && (
+            ['unpaid', 'partial', 'paid'].includes(String(r[12] || '').trim().toLowerCase()) ||
+            ['nhap', 'cho_xac_nhan', 'da_xac_nhan', 'dang_giao', 'hoan_thanh', 'huy'].includes(String(r[11] || '').trim().toLowerCase()) ||
+            (r.length >= 15 && isNumericString(r[14]) && !isNumericString(r[13]))
+          );
+
+        const hasPhoneAddress =
+          !isStandard17Cols &&
+          r.length >= 18 &&
+          (!isNumericString(r[3]) || !isNumericString(r[4])) &&
+          isNumericString(r[5]);
 
         let totalQuantity = 0;
         let itemsSubtotal = 0;
@@ -613,12 +653,26 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
         let totalPayment = 0;
         let paidAmount = 0;
         let debtAmount = 0;
-        let status: Order['status'] = 'nhap';
+        let status: Order['status'] = 'da_xac_nhan';
         let paymentStatus: Order['paymentStatus'] = 'unpaid';
         let creator = '';
         let notes = '';
 
-        if (hasPhoneAddress) {
+        if (isStandard17Cols) {
+          itemsSubtotal = parseSheetNumber(r[3]) || prev?.itemsSubtotal || 0;
+          shippingFee = parseSheetNumber(r[4]) || prev?.shippingFee || 0;
+          discount = parseSheetNumber(r[5]) || prev?.discount || 0;
+          totalAmount = parseSheetNumber(r[6]) || prev?.totalAmount || 0;
+          oldDebt = parseSheetNumber(r[7]) || prev?.oldDebt || 0;
+          totalPayment = parseSheetNumber(r[8]) || prev?.totalPayment || 0;
+          paidAmount = parseSheetNumber(r[9]) || prev?.paidAmount || 0;
+          debtAmount = parseSheetNumber(r[10]) || prev?.debtAmount || 0;
+          status = (String(r[11] || prev?.status || 'da_xac_nhan').trim()) as Order['status'];
+          paymentStatus = (String(r[12] || prev?.paymentStatus || 'unpaid').trim()) as Order['paymentStatus'];
+          creator = String(r[13] || '').trim() || prev?.creator || '';
+          totalQuantity = parseSheetNumber(r[14]) || prev?.totalQuantity || 0;
+          notes = String(r[15] || '').trim() || prev?.notes || '';
+        } else if (hasPhoneAddress) {
           totalQuantity = parseSheetNumber(r[5]) || prev?.totalQuantity || 0;
           itemsSubtotal = parseSheetNumber(r[6]) || prev?.itemsSubtotal || 0;
           shippingFee = parseSheetNumber(r[7]) || prev?.shippingFee || 0;
@@ -628,38 +682,26 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
           totalPayment = parseSheetNumber(r[11]) || prev?.totalPayment || 0;
           paidAmount = parseSheetNumber(r[12]) || prev?.paidAmount || 0;
           debtAmount = parseSheetNumber(r[13]) || prev?.debtAmount || 0;
-          status = (String(r[14] || prev?.status || 'nhap').trim()) as Order['status'];
+          status = (String(r[14] || prev?.status || 'da_xac_nhan').trim()) as Order['status'];
           paymentStatus = (String(r[15] || prev?.paymentStatus || 'unpaid').trim()) as Order['paymentStatus'];
           creator = String(r[16] || '').trim() || prev?.creator || '';
           notes = String(r[17] || '').trim() || prev?.notes || '';
-        } else if (isQtyAfterCreator) {
+        } else {
+          // Layout ngắn (7 cột): id, ngay, khach, thanh_tien, cuoc_xe, tru_hang, tong_tien
           itemsSubtotal = parseSheetNumber(r[3]) || prev?.itemsSubtotal || 0;
           shippingFee = parseSheetNumber(r[4]) || prev?.shippingFee || 0;
           discount = parseSheetNumber(r[5]) || prev?.discount || 0;
-          totalAmount = parseSheetNumber(r[6]) || prev?.totalAmount || 0;
-          oldDebt = parseSheetNumber(r[7]) || prev?.oldDebt || 0;
-          totalPayment = parseSheetNumber(r[8]) || prev?.totalPayment || 0;
-          paidAmount = parseSheetNumber(r[9]) || prev?.paidAmount || 0;
-          debtAmount = parseSheetNumber(r[10]) || prev?.debtAmount || 0;
-          status = (String(r[11] || prev?.status || 'nhap').trim()) as Order['status'];
-          paymentStatus = (String(r[12] || prev?.paymentStatus || 'unpaid').trim()) as Order['paymentStatus'];
-          creator = String(r[13] || '').trim() || prev?.creator || '';
-          totalQuantity = parseSheetNumber(r[14]) || prev?.totalQuantity || 0;
-          notes = String(r[15] || '').trim() || prev?.notes || '';
-        } else {
-          totalQuantity = parseSheetNumber(r[3]) || prev?.totalQuantity || 0;
-          itemsSubtotal = parseSheetNumber(r[4]) || prev?.itemsSubtotal || 0;
-          shippingFee = parseSheetNumber(r[5]) || prev?.shippingFee || 0;
-          discount = parseSheetNumber(r[6]) || prev?.discount || 0;
-          totalAmount = parseSheetNumber(r[7]) || prev?.totalAmount || 0;
-          oldDebt = parseSheetNumber(r[8]) || prev?.oldDebt || 0;
-          totalPayment = parseSheetNumber(r[9]) || prev?.totalPayment || 0;
-          paidAmount = parseSheetNumber(r[10]) || prev?.paidAmount || 0;
-          debtAmount = parseSheetNumber(r[11]) || prev?.debtAmount || 0;
-          status = (String(r[12] || prev?.status || 'nhap').trim()) as Order['status'];
-          paymentStatus = (String(r[13] || prev?.paymentStatus || 'unpaid').trim()) as Order['paymentStatus'];
-          creator = String(r[14] || '').trim() || prev?.creator || '';
-          notes = String(r[15] || '').trim() || prev?.notes || '';
+          totalAmount = parseSheetNumber(r[6]) || prev?.totalAmount || (itemsSubtotal + shippingFee - discount);
+          status = prev?.status || 'da_xac_nhan';
+          paymentStatus = prev?.paymentStatus || 'unpaid';
+          creator = prev?.creator || '';
+          notes = String(r[7] || prev?.notes || '').trim();
+        }
+
+        // Tự động tính tổng số lượng hoa từ các dòng chi tiết nếu đơn chưa có số lượng
+        const totalQtyFromItems = sheetItems?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+        if (!totalQuantity && totalQtyFromItems > 0) {
+          totalQuantity = totalQtyFromItems;
         }
 
         return {
