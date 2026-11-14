@@ -5,6 +5,7 @@ import {
   Clock,
   Coins,
   ExternalLink,
+  Lock,
   Package,
   Printer,
   ShoppingCart,
@@ -16,6 +17,8 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import { Drawer } from '@/components/ui/Drawer';
 import { useDebtStore, useOrderStore } from '@/stores/hoaKhangThanhStore';
+import { useAuthStore } from '@/stores/auth';
+import { usePermissionStore } from '@/stores/permissionStore';
 import type { Order } from '@/types/hoaKhangThanh';
 import { formatDate } from '@/lib/format';
 import { checkCustomerOverdueDebt } from '@/lib/debtCheck';
@@ -30,6 +33,12 @@ interface Props {
 export function DonHangDetailModal({ order, onClose, onEdit }: Props) {
   const { orders, updateOrderStatus } = useOrderStore();
   const debtRecords = useDebtStore((s) => s.records);
+  const currentUser = useAuthStore((s) => s.user);
+  const getOrderItemRights = usePermissionStore((s) => s.getOrderItemRights);
+
+  const itemRights = useMemo(() => {
+    return getOrderItemRights(currentUser?.id || '');
+  }, [currentUser?.id, getOrderItemRights]);
 
   const debtCheck = useMemo(() => {
     if (!order) return null;
@@ -179,7 +188,7 @@ export function DonHangDetailModal({ order, onClose, onEdit }: Props) {
             <Button size="sm" variant="outline" onClick={handlePrint} className="gap-1 text-xs">
               <Printer size={13} /> In phiếu
             </Button>
-            {onEdit && (
+            {onEdit && itemRights.actions.edit && (
               <Button
                 size="sm"
                 onClick={() => onEdit(order)}
@@ -273,95 +282,138 @@ export function DonHangDetailModal({ order, onClose, onEdit }: Props) {
           </div>
         )}
 
-        {/* Bảng chi tiết mặt hàng (BỎ ĐVT, BỎ Đ, GIAO DIỆN THOÁNG GỌN) */}
+        {/* Bảng chi tiết mặt hàng (BỎ ĐVT, BỎ Đ, GIAO DIỆN THOÁNG GỌN, PHÂN QUYỀN TỪNG CỘT) */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <Package size={14} className="text-primary" />
               Chi tiết mặt hàng ({order.items.length} loại)
             </h3>
-            <span className="text-xs font-bold text-primary font-mono">
-              Tổng SL: {formatNumber(totalQuantity)}
-            </span>
+            {itemRights.columns.quantity && (
+              <span className="text-xs font-bold text-primary font-mono">
+                Tổng SL: {formatNumber(totalQuantity)}
+              </span>
+            )}
           </div>
 
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left border-collapse min-w-[760px]">
-                <thead>
-                  <tr className="bg-muted/60 text-muted-foreground font-semibold border-b border-border text-[11px] uppercase tracking-wider">
-                    <th className="py-2.5 px-1.5 text-center w-8">#</th>
-                    <th className="py-2.5 px-3 min-w-[220px]">Mặt hàng</th>
-                    <th className="py-2.5 px-2 text-right w-20">Số lượng</th>
-                    <th className="py-2.5 px-2 text-right w-24">Giá nhập</th>
-                    <th className="py-2.5 px-2 text-right w-24">Giá bán</th>
-                    <th className="py-2.5 px-2 text-right w-24">TT Nhập</th>
-                    <th className="py-2.5 px-2.5 text-right w-28">TT Bán</th>
-                    <th className="py-2.5 px-2.5 text-right w-24">Lợi nhuận</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {order.items.map((item, idx) => {
-                    const cost = item.costPrice || 0;
-                    const price = item.unitPrice || 0;
-                    const itemImportTotal = item.importTotal || cost * item.quantity;
-                    const itemAmount = item.amount || price * item.quantity;
-                    const itemProfit = item.profit !== undefined ? item.profit : itemAmount - itemImportTotal;
-
-                    return (
-                      <tr key={idx} className="hover:bg-muted/15 transition-colors">
-                        <td className="py-1.5 px-1 text-center font-mono text-muted-foreground text-[11px]">{idx + 1}</td>
-                        <td className="py-1.5 px-2 font-medium text-foreground">
-                          <div>{item.flowerName}</div>
-                          <span className="text-[10px] text-muted-foreground font-mono">{item.flowerCode}</span>
-                        </td>
-                        <td className="py-1.5 px-1 text-right font-bold text-foreground font-mono">
-                          {formatNumber(item.quantity)}
-                        </td>
-                        <td className="py-1.5 px-1 text-right text-muted-foreground font-mono">
-                          {formatNumber(cost)}
-                        </td>
-                        <td className="py-1.5 px-1 text-right font-semibold text-primary font-mono">
-                          {formatNumber(price)}
-                        </td>
-                        <td className="py-1.5 px-1.5 text-right text-muted-foreground font-mono">
-                          {formatNumber(itemImportTotal)}
-                        </td>
-                        <td className="py-1.5 px-1.5 text-right font-bold text-foreground font-mono">
-                          {formatNumber(itemAmount)}
-                        </td>
-                        <td className="py-1.5 px-1.5 text-right font-bold font-mono">
-                          <span className={itemProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
-                            {itemProfit >= 0 ? '+' : ''}{formatNumber(itemProfit)}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot className="bg-muted/40 font-bold border-t border-border text-xs">
-                  <tr>
-                    <td colSpan={2} className="py-2 px-2 text-right text-muted-foreground uppercase text-[11px]">
-                      Tổng cộng:
-                    </td>
-                    <td className="py-2 px-1 text-right font-mono font-extrabold text-foreground">
-                      {formatNumber(totalQuantity)}
-                    </td>
-                    <td colSpan={2}></td>
-                    <td className="py-2 px-1.5 text-right font-mono text-muted-foreground">
-                      {formatNumber(totalCost)}
-                    </td>
-                    <td className="py-2 px-1.5 text-right font-mono text-primary text-sm font-extrabold">
-                      {formatNumber(itemsSubtotal)}
-                    </td>
-                    <td className="py-2 px-1.5 text-right font-mono text-emerald-600 font-extrabold">
-                      +{formatNumber(totalProfit)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+          {!itemRights.actions.view ? (
+            <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-center">
+              <Lock size={20} className="mx-auto text-muted-foreground/60 mb-2" />
+              <div className="font-semibold text-xs text-foreground">Bạn không có quyền xem chi tiết mặt hàng đơn này</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">Vui lòng liên hệ Quản trị viên để được cấp quyền xem bảng này.</div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left border-collapse min-w-[500px]">
+                  <thead>
+                    <tr className="bg-muted/60 text-muted-foreground font-semibold border-b border-border text-[11px] uppercase tracking-wider">
+                      {itemRights.columns.stt && <th className="py-2.5 px-1.5 text-center w-8">#</th>}
+                      {itemRights.columns.flower && <th className="py-2.5 px-3 min-w-[200px]">Mặt hàng</th>}
+                      {itemRights.columns.quantity && <th className="py-2.5 px-2 text-right w-20">Số lượng</th>}
+                      {itemRights.columns.costPrice && <th className="py-2.5 px-2 text-right w-24">Giá nhập</th>}
+                      {itemRights.columns.unitPrice && <th className="py-2.5 px-2 text-right w-24">Giá bán</th>}
+                      {itemRights.columns.importTotal && <th className="py-2.5 px-2 text-right w-24">TT Nhập</th>}
+                      {itemRights.columns.amount && <th className="py-2.5 px-2.5 text-right w-28">TT Bán</th>}
+                      {itemRights.columns.profit && <th className="py-2.5 px-2.5 text-right w-24">Lợi nhuận</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {order.items.map((item, idx) => {
+                      const cost = item.costPrice || 0;
+                      const price = item.unitPrice || 0;
+                      const itemImportTotal = item.importTotal || cost * item.quantity;
+                      const itemAmount = item.amount || price * item.quantity;
+                      const itemProfit = item.profit !== undefined ? item.profit : itemAmount - itemImportTotal;
+
+                      return (
+                        <tr key={idx} className="hover:bg-muted/15 transition-colors">
+                          {itemRights.columns.stt && (
+                            <td className="py-1.5 px-1 text-center font-mono text-muted-foreground text-[11px]">{idx + 1}</td>
+                          )}
+                          {itemRights.columns.flower && (
+                            <td className="py-1.5 px-2 font-medium text-foreground">
+                              <div>{item.flowerName}</div>
+                              <span className="text-[10px] text-muted-foreground font-mono">{item.flowerCode}</span>
+                            </td>
+                          )}
+                          {itemRights.columns.quantity && (
+                            <td className="py-1.5 px-1 text-right font-bold text-foreground font-mono">
+                              {formatNumber(item.quantity)}
+                            </td>
+                          )}
+                          {itemRights.columns.costPrice && (
+                            <td className="py-1.5 px-1 text-right text-muted-foreground font-mono">
+                              {formatNumber(cost)}
+                            </td>
+                          )}
+                          {itemRights.columns.unitPrice && (
+                            <td className="py-1.5 px-1 text-right font-semibold text-primary font-mono">
+                              {formatNumber(price)}
+                            </td>
+                          )}
+                          {itemRights.columns.importTotal && (
+                            <td className="py-1.5 px-1.5 text-right text-muted-foreground font-mono">
+                              {formatNumber(itemImportTotal)}
+                            </td>
+                          )}
+                          {itemRights.columns.amount && (
+                            <td className="py-1.5 px-1.5 text-right font-bold text-foreground font-mono">
+                              {formatNumber(itemAmount)}
+                            </td>
+                          )}
+                          {itemRights.columns.profit && (
+                            <td className="py-1.5 px-1.5 text-right font-bold font-mono">
+                              <span className={itemProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
+                                {itemProfit >= 0 ? '+' : ''}{formatNumber(itemProfit)}
+                              </span>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-muted/40 font-bold border-t border-border text-xs">
+                    <tr>
+                      {(() => {
+                        const countLeading = (itemRights.columns.stt ? 1 : 0) + (itemRights.columns.flower ? 1 : 0);
+                        if (countLeading > 0) {
+                          return (
+                            <td colSpan={countLeading} className="py-2 px-2 text-right text-muted-foreground uppercase text-[11px]">
+                              Tổng cộng:
+                            </td>
+                          );
+                        }
+                        return null;
+                      })()}
+                      {itemRights.columns.quantity && (
+                        <td className="py-2 px-1 text-right font-mono font-extrabold text-foreground">
+                          {formatNumber(totalQuantity)}
+                        </td>
+                      )}
+                      {itemRights.columns.costPrice && <td></td>}
+                      {itemRights.columns.unitPrice && <td></td>}
+                      {itemRights.columns.importTotal && (
+                        <td className="py-2 px-1.5 text-right font-mono text-muted-foreground">
+                          {formatNumber(totalCost)}
+                        </td>
+                      )}
+                      {itemRights.columns.amount && (
+                        <td className="py-2 px-1.5 text-right font-mono text-primary text-sm font-extrabold">
+                          {formatNumber(itemsSubtotal)}
+                        </td>
+                      )}
+                      {itemRights.columns.profit && (
+                        <td className="py-2 px-1.5 text-right font-mono text-emerald-600 font-extrabold">
+                          +{formatNumber(totalProfit)}
+                        </td>
+                      )}
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Khối tổng hợp tài chính (Không có ký hiệu đ) */}
@@ -371,9 +423,11 @@ export function DonHangDetailModal({ order, onClose, onEdit }: Props) {
               <Coins size={14} className="text-primary" />
               Tổng kết thanh toán & Công nợ
             </span>
-            <div className="text-xs text-muted-foreground">
-              Tổng vốn nhập: <strong className="font-mono text-foreground">{formatNumber(totalCost)}</strong> • Lợi nhuận: <strong className="font-mono text-emerald-600">+{formatNumber(totalProfit)}</strong>
-            </div>
+            {itemRights.columns.summaryProfitCost && (
+              <div className="text-xs text-muted-foreground">
+                Tổng vốn nhập: <strong className="font-mono text-foreground">{formatNumber(totalCost)}</strong> • Lợi nhuận: <strong className="font-mono text-emerald-600">+{formatNumber(totalProfit)}</strong>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">

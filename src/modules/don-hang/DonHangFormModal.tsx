@@ -31,6 +31,7 @@ import { getDistributorDebtAsOfDate } from '@/lib/orderDebtHelper';
 import { formatDate } from '@/lib/format';
 import { PartnerAutocomplete, type PartnerOption } from '@/components/ui/PartnerAutocomplete';
 import { useAuthStore } from '@/stores/auth';
+import { usePermissionStore } from '@/stores/permissionStore';
 
 dayjs.extend(customParseFormat);
 
@@ -408,6 +409,10 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
   const updateOrder = useOrderStore((s) => s.updateOrder);
   const currentUser = useAuthStore((s) => s.user);
   const loggedInCreator = currentUser?.full_name?.trim() || currentUser?.code || 'Người dùng';
+  const getOrderItemRights = usePermissionStore((s) => s.getOrderItemRights);
+  const itemRights = useMemo(() => {
+    return getOrderItemRights(currentUser?.id || '');
+  }, [currentUser?.id, getOrderItemRights]);
 
   const [code, setCode] = useState('');
   const [distributorId, setDistributorId] = useState('');
@@ -1119,90 +1124,94 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
                 </span>
               </div>
 
-              <Button
-                type="button"
-                size="sm"
-                onClick={addItem}
-                className="h-7 gap-1 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
-              >
-                <Plus size={13} className="stroke-[2.5px]" />
-                <span>+ Thêm dòng</span>
-              </Button>
+              {(orderToEdit ? itemRights.actions.edit : itemRights.actions.create) && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={addItem}
+                  className="h-7 gap-1 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
+                >
+                  <Plus size={13} className="stroke-[2.5px]" />
+                  <span>+ Thêm dòng</span>
+                </Button>
+              )}
             </div>
 
             {/* THANH TÌM KIẾM NHANH & THÊM HOA VÀO ĐƠN - ĐẶT NGOÀI BẢNG KHÔNG BỊ CLIPPED */}
-            <div className="relative" ref={quickSearchRef}>
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-2.5 text-muted-foreground pointer-events-none" />
-                <input
-                  type="text"
-                  value={quickSearch}
-                  onChange={(e) => {
-                    setQuickSearch(e.target.value);
-                    setIsQuickSearchOpen(true);
-                  }}
-                  onFocus={() => setIsQuickSearchOpen(true)}
-                  placeholder="🔍 Gõ tên hoặc mã hoa để thêm nhanh (VD: Hồng, Baby, Cúc, HH-DO-01...)"
-                  className="w-full h-9 pl-9 pr-8 rounded-xl border border-primary/40 bg-card text-xs font-semibold text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none shadow-xs"
-                />
-                {quickSearch && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuickSearch('');
-                      setIsQuickSearchOpen(false);
+            {(orderToEdit ? itemRights.actions.edit : itemRights.actions.create) && (
+              <div className="relative" ref={quickSearchRef}>
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-2.5 text-muted-foreground pointer-events-none" />
+                  <input
+                    type="text"
+                    value={quickSearch}
+                    onChange={(e) => {
+                      setQuickSearch(e.target.value);
+                      setIsQuickSearchOpen(true);
                     }}
-                    className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-
-              {/* Dropdown gợi ý hoa khi tìm kiếm nhanh */}
-              {isQuickSearchOpen && (
-                <div className="absolute left-0 right-0 top-full mt-1.5 z-40 max-h-72 overflow-y-auto rounded-xl border border-border bg-card shadow-2xl divide-y divide-border/60">
-                  <div className="p-2 text-[11px] font-bold text-muted-foreground bg-muted/60 flex items-center justify-between">
-                    <span>Gợi ý hoa ({quickFilteredFlowers.length} loại)</span>
-                    <span className="text-[10px] text-primary font-normal">Nhấn để thêm vào đơn</span>
-                  </div>
-                  {quickFilteredFlowers.length === 0 ? (
-                    <div className="p-4 text-xs text-muted-foreground text-center">
-                      Không tìm thấy loại hoa nào phù hợp với "{quickSearch}"
-                    </div>
-                  ) : (
-                    quickFilteredFlowers.map((fl) => (
-                      <button
-                        type="button"
-                        key={fl.id}
-                        onClick={() => handleQuickAddFlower(fl)}
-                        className="w-full text-left p-2.5 hover:bg-primary/5 flex items-center justify-between gap-3 transition-colors border-b border-border/30 last:border-b-0"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="text-foreground font-semibold text-xs flex items-center gap-2">
-                            <span className="px-1.5 py-0.5 rounded font-mono text-primary font-bold bg-primary/10 text-[11px] shrink-0">{fl.code}</span>
-                            <span className="text-sm font-bold text-foreground truncate">{fl.name}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-1 flex-wrap">
-                            <span>
-                              Tồn kho: <strong className={fl.stock < 100 ? 'text-amber-600' : 'text-foreground font-mono'}>{formatNumber(fl.stock)}</strong>
-                            </span>
-                            {fl.customName && (
-                              <span className="flex items-center gap-1">
-                                <span className="text-muted-foreground/60">•</span>
-                                <span className="text-primary font-semibold bg-primary/10 px-1.5 py-0.5 rounded text-[11px]">
-                                  Tên riêng: {fl.customName}
-                                </span>
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    ))
+                    onFocus={() => setIsQuickSearchOpen(true)}
+                    placeholder="🔍 Gõ tên hoặc mã hoa để thêm nhanh (VD: Hồng, Baby, Cúc, HH-DO-01...)"
+                    className="w-full h-9 pl-9 pr-8 rounded-xl border border-primary/40 bg-card text-xs font-semibold text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none shadow-xs"
+                  />
+                  {quickSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuickSearch('');
+                        setIsQuickSearchOpen(false);
+                      }}
+                      className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                    >
+                      <X size={14} />
+                    </button>
                   )}
                 </div>
-              )}
-            </div>
+
+                {/* Dropdown gợi ý hoa khi tìm kiếm nhanh */}
+                {isQuickSearchOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-40 max-h-72 overflow-y-auto rounded-xl border border-border bg-card shadow-2xl divide-y divide-border/60">
+                    <div className="p-2 text-[11px] font-bold text-muted-foreground bg-muted/60 flex items-center justify-between">
+                      <span>Gợi ý hoa ({quickFilteredFlowers.length} loại)</span>
+                      <span className="text-[10px] text-primary font-normal">Nhấn để thêm vào đơn</span>
+                    </div>
+                    {quickFilteredFlowers.length === 0 ? (
+                      <div className="p-4 text-xs text-muted-foreground text-center">
+                        Không tìm thấy loại hoa nào phù hợp với "{quickSearch}"
+                      </div>
+                    ) : (
+                      quickFilteredFlowers.map((fl) => (
+                        <button
+                          type="button"
+                          key={fl.id}
+                          onClick={() => handleQuickAddFlower(fl)}
+                          className="w-full text-left p-2.5 hover:bg-primary/5 flex items-center justify-between gap-3 transition-colors border-b border-border/30 last:border-b-0"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="text-foreground font-semibold text-xs flex items-center gap-2">
+                              <span className="px-1.5 py-0.5 rounded font-mono text-primary font-bold bg-primary/10 text-[11px] shrink-0">{fl.code}</span>
+                              <span className="text-sm font-bold text-foreground truncate">{fl.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-1 flex-wrap">
+                              <span>
+                                Tồn kho: <strong className={fl.stock < 100 ? 'text-amber-600' : 'text-foreground font-mono'}>{formatNumber(fl.stock)}</strong>
+                              </span>
+                              {fl.customName && (
+                                <span className="flex items-center gap-1">
+                                  <span className="text-muted-foreground/60">•</span>
+                                  <span className="text-primary font-semibold bg-primary/10 px-1.5 py-0.5 rounded text-[11px]">
+                                    Tên riêng: {fl.customName}
+                                  </span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 3 TABS CHỌN CHẾ ĐỘ XEM: TẤT CẢ, GIÁ BÁN, GIÁ NHẬP */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
@@ -1291,32 +1300,34 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
                     <th className="border border-border/80 py-2.5 px-3 min-w-[300px]">Mặt hàng (Mã hoa • Tên hoa • Tồn)</th>
                     <th className="border border-border/80 py-2.5 px-2.5 text-right w-28 min-w-[110px] whitespace-nowrap">Số lượng</th>
 
-                    {/* Cột Giá nhập: Hiện ở tab Tất cả & Giá nhập */}
-                    {(tableTab === 'tat_ca' || tableTab === 'gia_nhap') && (
+                    {/* Cột Giá nhập: Hiện ở tab Tất cả & Giá nhập nếu có quyền */}
+                    {itemRights.columns.costPrice && (tableTab === 'tat_ca' || tableTab === 'gia_nhap') && (
                       <th className="border border-border/80 py-2.5 px-2.5 text-right w-32 min-w-[125px] whitespace-nowrap">Giá nhập</th>
                     )}
 
-                    {/* Cột Giá bán: Hiện ở tab Tất cả & Giá bán */}
-                    {(tableTab === 'tat_ca' || tableTab === 'gia_ban') && (
+                    {/* Cột Giá bán: Hiện ở tab Tất cả & Giá bán nếu có quyền */}
+                    {itemRights.columns.unitPrice && (tableTab === 'tat_ca' || tableTab === 'gia_ban') && (
                       <th className="border border-border/80 py-2.5 px-2.5 text-right w-32 min-w-[125px] whitespace-nowrap">Giá bán</th>
                     )}
 
-                    {/* Cột TT Nhập: Hiện ở tab Tất cả & Giá nhập */}
-                    {(tableTab === 'tat_ca' || tableTab === 'gia_nhap') && (
+                    {/* Cột TT Nhập: Hiện ở tab Tất cả & Giá nhập nếu có quyền */}
+                    {itemRights.columns.importTotal && (tableTab === 'tat_ca' || tableTab === 'gia_nhap') && (
                       <th className="border border-border/80 py-2.5 px-2.5 text-right w-32 min-w-[120px] whitespace-nowrap">TT Nhập</th>
                     )}
 
-                    {/* Cột TT Bán: Hiện ở tab Tất cả & Giá bán */}
-                    {(tableTab === 'tat_ca' || tableTab === 'gia_ban') && (
+                    {/* Cột TT Bán: Hiện ở tab Tất cả & Giá bán nếu có quyền */}
+                    {itemRights.columns.amount && (tableTab === 'tat_ca' || tableTab === 'gia_ban') && (
                       <th className="border border-border/80 py-2.5 px-2.5 text-right w-36 min-w-[130px] whitespace-nowrap">TT Bán</th>
                     )}
 
-                    {/* Cột Lợi nhuận: Chỉ hiện ở tab Tất cả */}
-                    {tableTab === 'tat_ca' && (
+                    {/* Cột Lợi nhuận: Chỉ hiện ở tab Tất cả nếu có quyền */}
+                    {itemRights.columns.profit && tableTab === 'tat_ca' && (
                       <th className="border border-border/80 py-2.5 px-2.5 text-right w-32 min-w-[120px] whitespace-nowrap">Lợi nhuận</th>
                     )}
 
-                    <th className="border border-border/80 py-2.5 px-2 text-center w-10 min-w-[40px]"></th>
+                    {itemRights.actions.delete && (
+                      <th className="border border-border/80 py-2.5 px-2 text-center w-10 min-w-[40px]"></th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -1389,7 +1400,7 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
                       </td>
 
                       {/* Giá nhập - không khung bao quanh, ô kẻ khung liền mạch */}
-                      {(tableTab === 'tat_ca' || tableTab === 'gia_nhap') && (
+                      {itemRights.columns.costPrice && (tableTab === 'tat_ca' || tableTab === 'gia_nhap') && (
                         <td className="border border-border/70 p-0 w-32 min-w-[125px]">
                           <FormattedNumberInput
                             value={item.costPrice}
@@ -1404,7 +1415,7 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
                       )}
 
                       {/* Giá bán - không khung bao quanh, ô kẻ khung liền mạch */}
-                      {(tableTab === 'tat_ca' || tableTab === 'gia_ban') && (
+                      {itemRights.columns.unitPrice && (tableTab === 'tat_ca' || tableTab === 'gia_ban') && (
                         <td className="border border-border/70 p-0 w-32 min-w-[125px]">
                           <FormattedNumberInput
                             value={item.unitPrice}
@@ -1419,21 +1430,21 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
                       )}
 
                       {/* TT Nhập (Vốn) có dấu . */}
-                      {(tableTab === 'tat_ca' || tableTab === 'gia_nhap') && (
+                      {itemRights.columns.importTotal && (tableTab === 'tat_ca' || tableTab === 'gia_nhap') && (
                         <td className="border border-border/70 py-2 px-2.5 text-right font-mono text-muted-foreground text-xs font-medium w-32 min-w-[120px] whitespace-nowrap">
                           {formatNumber(item.importTotal)}
                         </td>
                       )}
 
                       {/* TT Bán (Doanh thu) có dấu . */}
-                      {(tableTab === 'tat_ca' || tableTab === 'gia_ban') && (
+                      {itemRights.columns.amount && (tableTab === 'tat_ca' || tableTab === 'gia_ban') && (
                         <td className="border border-border/70 py-2 px-2.5 text-right font-mono font-bold text-primary text-xs w-36 min-w-[130px] whitespace-nowrap">
                           {formatNumber(item.amount)}
                         </td>
                       )}
 
                       {/* Lợi nhuận có dấu . */}
-                      {tableTab === 'tat_ca' && (
+                      {itemRights.columns.profit && tableTab === 'tat_ca' && (
                         <td className="border border-border/70 py-2 px-2.5 text-right font-mono font-bold text-xs w-32 min-w-[120px] whitespace-nowrap">
                           <span className={item.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
                             {item.profit >= 0 ? '+' : ''}{formatNumber(item.profit)}
@@ -1442,16 +1453,18 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
                       )}
 
                       {/* Thao tác xóa */}
-                      <td className="border border-border/70 py-2 px-1 text-center w-10 min-w-[40px]">
-                        <button
-                          type="button"
-                          onClick={() => removeItem(idx)}
-                          className="p-1 rounded text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                          title="Xóa mặt hàng"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
+                      {itemRights.actions.delete && (
+                        <td className="border border-border/70 py-2 px-1 text-center w-10 min-w-[40px]">
+                          <button
+                            type="button"
+                            onClick={() => removeItem(idx)}
+                            className="p-1 rounded text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                            title="Xóa mặt hàng"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -1534,26 +1547,28 @@ export function DonHangFormModal({ isOpen, onClose, orderToEdit }: Props) {
               </div>
 
               {/* Thẻ phân tích lợi nhuận nội bộ */}
-              <div className="p-2.5 rounded-lg bg-muted/30 border border-border/70 space-y-1 text-xs">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <TrendingUp size={12} className="text-emerald-600" />
-                  Hiệu quả kinh doanh đơn hàng
-                </span>
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Tổng giá vốn nhập:</span>
-                  <strong className="font-mono text-foreground">{formatNumber(totalCost)}</strong>
+              {itemRights.columns.summaryProfitCost && (
+                <div className="p-2.5 rounded-lg bg-muted/30 border border-border/70 space-y-1 text-xs">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <TrendingUp size={12} className="text-emerald-600" />
+                    Hiệu quả kinh doanh đơn hàng
+                  </span>
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Tổng giá vốn nhập:</span>
+                    <strong className="font-mono text-foreground">{formatNumber(totalCost)}</strong>
+                  </div>
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Lợi nhuận gộp từ hàng:</span>
+                    <strong className="font-mono text-emerald-600 font-bold">+{formatNumber(totalProfitFromItems)}</strong>
+                  </div>
+                  <div className="flex items-center justify-between text-muted-foreground border-t border-border/50 pt-1">
+                    <span>Tỷ suất lợi nhuận:</span>
+                    <strong className="font-mono text-primary font-bold">
+                      {itemsSubtotal > 0 ? ((totalProfitFromItems / itemsSubtotal) * 100).toFixed(1) : 0}%
+                    </strong>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Lợi nhuận gộp từ hàng:</span>
-                  <strong className="font-mono text-emerald-600 font-bold">+{formatNumber(totalProfitFromItems)}</strong>
-                </div>
-                <div className="flex items-center justify-between text-muted-foreground border-t border-border/50 pt-1">
-                  <span>Tỷ suất lợi nhuận:</span>
-                  <strong className="font-mono text-primary font-bold">
-                    {itemsSubtotal > 0 ? ((totalProfitFromItems / itemsSubtotal) * 100).toFixed(1) : 0}%
-                  </strong>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* CỘT PHẢI: Bảng thanh toán chuẩn kế toán (Số nhập có dấu .) */}
