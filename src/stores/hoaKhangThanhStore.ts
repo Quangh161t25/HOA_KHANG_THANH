@@ -647,7 +647,7 @@ export const useDebtStore = create<DebtState>()(
 
           const newRecord: DebtDailyRecord = {
             ...r,
-            id: `debt-${Date.now()}`,
+            id: (r as any).id || `CN-${Date.now()}`,
             entryType: r.entryType || 'daily',
             type: r.type || (r.decreaseAmount && r.decreaseAmount > 0 ? 'thu' : 'chi'),
             amount: amt,

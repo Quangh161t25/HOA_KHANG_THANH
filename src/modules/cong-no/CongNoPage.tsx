@@ -55,9 +55,10 @@ const NPP_COLUMNS: ColumnDef[] = [
   { id: 'remainingDebt', label: 'Công nợ còn', visible: true, minWidth: 125, width: 135, order: 6 },
   { id: 'creator', label: 'Người lập', visible: true, minWidth: 110, width: 125, order: 7 },
   { id: 'actions', label: 'Thao tác', visible: true, minWidth: 80, width: 85, order: 8 },
-  { id: 'partnerCode', label: 'Mã NPP', visible: false, minWidth: 95, width: 105, order: 9 },
-  { id: 'phone', label: 'Số điện thoại', visible: false, minWidth: 110, width: 120, order: 10 },
-  { id: 'notes', label: 'Ghi chú', visible: false, minWidth: 180, width: 220, order: 11 },
+  { id: 'id', label: 'Mã công nợ (ID)', visible: false, minWidth: 120, width: 135, order: 9 },
+  { id: 'partnerCode', label: 'Mã NPP', visible: false, minWidth: 95, width: 105, order: 10 },
+  { id: 'phone', label: 'Số điện thoại', visible: false, minWidth: 110, width: 120, order: 11 },
+  { id: 'notes', label: 'Ghi chú', visible: false, minWidth: 180, width: 220, order: 12 },
 ];
 
 const NCC_COLUMNS: ColumnDef[] = [
@@ -70,9 +71,10 @@ const NCC_COLUMNS: ColumnDef[] = [
   { id: 'remainingDebt', label: 'Công nợ còn', visible: true, minWidth: 125, width: 135, order: 6 },
   { id: 'creator', label: 'Người lập', visible: true, minWidth: 110, width: 125, order: 7 },
   { id: 'actions', label: 'Thao tác', visible: true, minWidth: 80, width: 85, order: 8 },
-  { id: 'partnerCode', label: 'Mã NCC', visible: false, minWidth: 95, width: 105, order: 9 },
-  { id: 'phone', label: 'Số điện thoại', visible: false, minWidth: 110, width: 120, order: 10 },
-  { id: 'notes', label: 'Ghi chú', visible: false, minWidth: 180, width: 220, order: 11 },
+  { id: 'id', label: 'Mã công nợ (ID)', visible: false, minWidth: 120, width: 135, order: 9 },
+  { id: 'partnerCode', label: 'Mã NCC', visible: false, minWidth: 95, width: 105, order: 10 },
+  { id: 'phone', label: 'Số điện thoại', visible: false, minWidth: 110, width: 120, order: 11 },
+  { id: 'notes', label: 'Ghi chú', visible: false, minWidth: 180, width: 220, order: 12 },
 ];
 
 export default function CongNoPage() {
@@ -566,6 +568,7 @@ export default function CongNoPage() {
 
       return {
         'STT': i + 1,
+        'Mã công nợ (ID)': r.id || '—',
         'Ngày ghi nhận': formatDate(r.date),
         'Hình thức ghi': isOrder ? 'Ghi theo đơn' : 'Ghi theo ngày',
         'Đối tượng': r.partnerType === 'npp' ? 'Nhà Phân Phối' : 'Nhà Cung Cấp',
@@ -698,6 +701,12 @@ export default function CongNoPage() {
         );
       case 'creator':
         return <span className="text-xs text-muted-foreground">{row.creator || '—'}</span>;
+      case 'id':
+        return (
+          <span className="text-xs font-mono font-semibold text-muted-foreground px-2 py-0.5 rounded bg-muted/60 border border-border">
+            {row.id || '—'}
+          </span>
+        );
       case 'phone':
         return <span className="text-xs font-mono text-muted-foreground">{row.phone || '—'}</span>;
       case 'notes':

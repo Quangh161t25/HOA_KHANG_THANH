@@ -1097,7 +1097,7 @@
        4. `NHA_PHAN_PHOI` (14 cột): Mã NPP, Tên nhà phân phối, Người liên hệ, SĐT, Địa chỉ, Khu vực, Công nợ cũ, Tổng tiền mua, Đã trả, Công nợ hiện tại, Ngày lên đơn gần nhất, Số ngày chưa mua, Cảnh báo nợ, Trạng thái.
        5. `NHA_CUNG_CAP` (11 cột): Mã NCC, Tên nhà cung cấp, Người đại diện, SĐT, Địa chỉ, Khu vực trồng, Công nợ cũ, Tổng tiền nhập, Đã trả NCC, Công nợ hiện tại, Trạng thái.
        6. `DON_NHAP_NCC` (12 cột): Mã đơn nhập, Ngày nhập, NCC, Số lượng hoa, Tiền hàng, Cước xe, Tổng thanh toán, Đã trả NCC, Còn nợ, Trạng thái nhập, Người lập, Ghi chú.
-       7. `CONG_NO` (9 cột): Ngày ghi nhận, Đối tác, Loại đối tác (NPP/NCC), Loại giao dịch, Số tiền phát sinh, Công nợ lũy kế, Mã đơn liên quan, Người phụ trách, Ghi chú.
+       7. `CONG_NO` (10 cột): Mã công nợ (ID), Ngày ghi nhận, Đối tác, Loại đối tác (NPP/NCC), Loại giao dịch, Số tiền phát sinh, Công nợ lũy kế, Mã đơn liên quan, Người phụ trách, Ghi chú.
        8. `THU_CHI` (9 cột): Mã phiếu, Ngày chứng từ, Loại phiếu (Thu/Chi), Hạng mục, Số tiền, Người nộp/nhận, Phương thức, Người lập, Ghi chú.
        9. `TON_KHO` (9 cột): Mã hoa, Tên hoa, Đơn vị tính, Tồn đầu kỳ, Nhập trong kỳ, Xuất trong kỳ, Tồn cuối kỳ, Cảnh báo tồn, Vị trí kho.
        10. `NHAN_VIEN` (11 cột): Mã nhân viên, Họ và tên, Tên đăng nhập, Chức vụ, Phòng ban, Quyền hạn, SĐT, Email, Ngày vào làm, Lương cơ bản, Trạng thái.

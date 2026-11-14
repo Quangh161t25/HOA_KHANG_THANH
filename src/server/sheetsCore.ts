@@ -112,7 +112,7 @@ const PULL_RANGES = [
   'TON_KHO!A2:I',
   'CHI_TIET_DON_HANG!A2:L',
   'DON_NHAP_NCC!A2:L',
-  'CONG_NO!A2:I',
+  'CONG_NO!A2:J',
 ];
 
 export interface ApiResult {

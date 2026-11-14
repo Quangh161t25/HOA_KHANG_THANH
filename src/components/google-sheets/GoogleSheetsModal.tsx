@@ -21,13 +21,13 @@ interface Props {
 }
 
 const MODULE_SHEETS = [
-  { name: 'DON_HANG', label: 'Đơn hàng bán', cols: 19, color: 'bg-blue-500', desc: 'Mã đơn, khách hàng, số lượng hoa, cước xe, tổng tiền, nợ cũ, thanh toán...' },
+  { name: 'DON_HANG', label: 'Đơn hàng bán', cols: 17, color: 'bg-blue-500', desc: 'Mã đơn, khách hàng, số lượng hoa, cước xe, tổng tiền, nợ cũ, thanh toán...' },
   { name: 'CHI_TIET_DON_HANG', label: 'Chi tiết hoa từng đơn', cols: 12, color: 'bg-emerald-500', desc: 'Mã hoa, tên hoa, số lượng, giá vốn, giá bán, thành tiền, lợi nhuận...' },
   { name: 'DANH_SACH_HOA', label: 'Danh mục hoa', cols: 7, color: 'bg-rose-500', desc: 'Mã hoa, tên hoa, tên riêng theo người đặt, ĐVT, danh mục, trạng thái...' },
   { name: 'NHA_PHAN_PHOI', label: 'Nhà phân phối', cols: 14, color: 'bg-sky-500', desc: 'Tên NPP, SĐT, địa chỉ, công nợ cũ, tiền mua, đã trả, nợ hiện tại, cảnh báo nợ...' },
   { name: 'NHA_CUNG_CAP', label: 'Nhà cung cấp', cols: 11, color: 'bg-amber-500', desc: 'Tên nhà vườn/NCC, người đại diện, SĐT, vùng trồng, công nợ cũ, tiền nhập...' },
   { name: 'DON_NHAP_NCC', label: 'Đơn nhập hoa', cols: 12, color: 'bg-orange-500', desc: 'Mã đơn nhập, NCC, số lượng hoa, tiền hàng, cước xe, đã trả, còn nợ...' },
-  { name: 'CONG_NO', label: 'Sổ công nợ tổng hợp', cols: 9, color: 'bg-purple-500', desc: 'Ngày ghi, đối tác, loại giao dịch, phát sinh, lũy kế nợ theo ngày...' },
+  { name: 'CONG_NO', label: 'Sổ công nợ tổng hợp', cols: 10, color: 'bg-purple-500', desc: 'Mã công nợ (ID), ngày ghi, đối tác, loại giao dịch, phát sinh, lũy kế nợ...' },
   { name: 'THU_CHI', label: 'Sổ quỹ thu chi', cols: 9, color: 'bg-emerald-600', desc: 'Mã phiếu, loại thu/chi, số tiền, người nộp/nhận, phương thức...' },
   { name: 'TON_KHO', label: 'Báo cáo tồn kho', cols: 9, color: 'bg-slate-500', desc: 'Mã hoa, tồn đầu kỳ, nhập, xuất, tồn cuối kỳ, cảnh báo tồn, vị trí kho...' },
   { name: 'NHAN_VIEN', label: 'Danh sách nhân sự', cols: 11, color: 'bg-indigo-500', desc: 'Mã NV, họ tên, chức vụ, phòng ban, quyền hạn, SĐT, ngày vào làm, lương...' },

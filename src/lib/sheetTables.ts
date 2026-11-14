@@ -183,9 +183,10 @@ export function buildSheetTables(body: SheetSyncBody): SheetTable[] {
     });
   }
 
-  // 7. CONG_NO
+  // 7. CONG_NO (10 cột: Mã công nợ / ID ở đầu, Ngày ghi nhận, Đối tác, Loại đối tác, Loại giao dịch, Số tiền, Công nợ lũy kế, Mã đơn, Người phụ trách, Ghi chú)
   if (body.debtRecords) {
-    const rows = body.debtRecords.map((r) => [
+    const rows = body.debtRecords.map((r, idx) => [
+      r.id || `CN-${String(idx + 1).padStart(4, '0')}`,
       toSheetDate(r.date),
       r.partnerName || '',
       r.partnerType === 'npp' ? 'NPP' : 'NCC',
@@ -197,8 +198,8 @@ export function buildSheetTables(body: SheetSyncBody): SheetTable[] {
       r.notes || '',
     ]);
     batchData.push({
-      range: 'CONG_NO!A2:I' + Math.max(2, rows.length + 1),
-      values: rows.length > 0 ? rows : [['', '', '', '', '', '', '', '', '']],
+      range: 'CONG_NO!A2:J' + Math.max(2, rows.length + 1),
+      values: rows.length > 0 ? rows : [['', '', '', '', '', '', '', '', '', '']],
     });
   }
 

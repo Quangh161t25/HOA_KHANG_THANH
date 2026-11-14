@@ -399,51 +399,86 @@ export async function pullFromGoogleSheets(): Promise<{ success: boolean; messag
     }
 
     // --- 7. CONG_NO ---
-    // Columns: date, partnerName, partnerType(NPP/NCC), type, amount, remainingDebt, referenceCode, creator, notes
+    // Layout 10 cột mới: [id, date, partnerName, partnerType(NPP/NCC), type, amount, remainingDebt, referenceCode, creator, notes]
+    // Layout 9 cột cũ (tương thích ngược): [date, partnerName, partnerType(NPP/NCC), type, amount, remainingDebt, referenceCode, creator, notes]
     const congNoRows = sheetMap['CONG_NO'] || [];
     if (congNoRows.length > 0) {
       const allDistributors = useDistributorStore.getState().distributors;
       const allSuppliers = useSupplierStore.getState().suppliers;
-      // Bỏ dòng tiêu đề bị lẫn vào dữ liệu ("ngay | khach_hang").
-      // Dòng công nợ của đơn hàng (có mã đơn) sẽ được syncAllOrdersToDebtRecords bỏ ra vì là cột ảo.
+
       const records: DebtDailyRecord[] = congNoRows
-        .filter((r) => r[0] && r[1] && !(String(r[0]).trim().toLowerCase() === 'ngay' && String(r[1]).trim().toLowerCase() === 'khach_hang'))
+        .filter((r) => {
+          if (!r[0] || !r[1]) return false;
+          const col0 = String(r[0]).trim().toLowerCase();
+          const col1 = String(r[1]).trim().toLowerCase();
+          // Bỏ dòng tiêu đề nếu lẫn vào dữ liệu
+          if (
+            col0 === 'id' ||
+            col0 === 'mã công nợ' ||
+            col0 === 'mã cn' ||
+            col0.includes('công nợ') ||
+            col0 === 'ngày' ||
+            col0 === 'ngày ghi nhận' ||
+            col1 === 'khách_hang' ||
+            col1 === 'ngày ghi nhận'
+          ) {
+            return false;
+          }
+          return true;
+        })
         .map((r, idx) => {
-        const partnerName = String(r[1] || '').trim();
-        const isNpp = r[2] === 'NPP';
-        const partnerType = (isNpp ? 'npp' : 'ncc') as DebtDailyRecord['partnerType'];
-        const matchedDist = isNpp
-          ? allDistributors.find((d) => d.name?.trim().toLowerCase() === partnerName.toLowerCase() || d.code === partnerName)
-          : null;
-        const matchedSup = !isNpp
-          ? allSuppliers.find((s) => s.name?.trim().toLowerCase() === partnerName.toLowerCase() || s.code === partnerName)
-          : null;
+          // Nhận diện xem hàng có cột ID ở đầu (10 cột) hay không:
+          // Nếu r[3] là NPP/NCC hoặc r.length >= 10 -> Layout mới có ID ở cột 0
+          const hasIdCol =
+            String(r[3] || '').trim().toUpperCase() === 'NPP' ||
+            String(r[3] || '').trim().toUpperCase() === 'NCC' ||
+            r.length >= 10;
 
-        const type = (r[3] === 'thu' || r[3] === 'Thu' ? 'thu' : 'chi') as DebtDailyRecord['type'];
-        const amount = parseSheetNumber(r[4]) || 0;
-        const isThu = type === 'thu';
-        const rawRef = String(r[6] || '').trim();
-        const isOrderRef = rawRef.startsWith('DH-') || rawRef.startsWith('PO-');
+          const recordId = hasIdCol
+            ? String(r[0] || '').trim() || `CN-${String(idx + 1).padStart(4, '0')}`
+            : `cn-sync-${idx + 1}`;
+          const dateStr = hasIdCol ? r[1] : r[0];
+          const partnerName = String((hasIdCol ? r[2] : r[1]) || '').trim();
+          const partnerTypeRaw = hasIdCol ? r[3] : r[2];
+          const isNpp = String(partnerTypeRaw || '').trim().toUpperCase() === 'NPP';
+          const partnerType = (isNpp ? 'npp' : 'ncc') as DebtDailyRecord['partnerType'];
+          const matchedDist = isNpp
+            ? allDistributors.find((d) => d.name?.trim().toLowerCase() === partnerName.toLowerCase() || d.code === partnerName)
+            : null;
+          const matchedSup = !isNpp
+            ? allSuppliers.find((s) => s.name?.trim().toLowerCase() === partnerName.toLowerCase() || s.code === partnerName)
+            : null;
 
-        return {
-          id: `cn-sync-${idx + 1}`,
-          date: fromSheetDate(r[0]),
-          partnerType,
-          partnerId: matchedDist?.id || matchedSup?.id || `partner-sync-${idx + 1}`,
-          partnerCode: matchedDist?.code || matchedSup?.code || '',
-          partnerName,
-          type,
-          amount,
-          remainingDebt: parseSheetNumber(r[5]) || 0,
-          finalDebt: parseSheetNumber(r[5]) || 0,
-          increaseAmount: isThu ? 0 : amount,
-          decreaseAmount: isThu ? amount : 0,
-          referenceCode: rawRef,
-          entryType: isOrderRef ? 'order' : 'daily',
-          creator: String(r[7] || '').trim(),
-          notes: String(r[8] || '').trim(),
-        };
-      });
+          const typeRaw = hasIdCol ? r[4] : r[3];
+          const type = (typeRaw === 'thu' || typeRaw === 'Thu' ? 'thu' : 'chi') as DebtDailyRecord['type'];
+          const amount = parseSheetNumber(hasIdCol ? r[5] : r[4]) || 0;
+          const remDebt = parseSheetNumber(hasIdCol ? r[6] : r[5]) || 0;
+          const rawRef = String((hasIdCol ? r[7] : r[6]) || '').trim();
+          const creator = String((hasIdCol ? r[8] : r[7]) || '').trim();
+          const notes = String((hasIdCol ? r[9] : r[8]) || '').trim();
+
+          const isThu = type === 'thu';
+          const isOrderRef = rawRef.startsWith('DH-') || rawRef.startsWith('PO-');
+
+          return {
+            id: recordId,
+            date: fromSheetDate(dateStr),
+            partnerType,
+            partnerId: matchedDist?.id || matchedSup?.id || `partner-sync-${idx + 1}`,
+            partnerCode: matchedDist?.code || matchedSup?.code || '',
+            partnerName,
+            type,
+            amount,
+            remainingDebt: remDebt,
+            finalDebt: remDebt,
+            increaseAmount: isThu ? 0 : amount,
+            decreaseAmount: isThu ? amount : 0,
+            referenceCode: rawRef,
+            entryType: isOrderRef ? 'order' : 'daily',
+            creator,
+            notes,
+          };
+        });
       useDebtStore.setState({ records });
       counts['cong_no'] = records.length;
     }
